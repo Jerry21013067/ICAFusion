@@ -200,9 +200,9 @@ def detect(opt):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', nargs='+', type=str, default='/home/ubuntu/Chenyf/multispectral-object-detection/runs/train/exp6/weights/best.pt', help='model.pt path(s)')
-    parser.add_argument('--source1', type=str, default='/home/shen/Chenyf/FLIR-align-3class/visible/test/', help='source')  # file/folder, 0 for webcam
-    parser.add_argument('--source2', type=str, default='/home/shen/Chenyf/FLIR-align-3class/infrared/test/', help='source')  # file/folder, 0 for webcam
+    parser.add_argument('--weights', nargs='+', type=str, default='weights/ICAFusion_FLIR.pt', help='model.pt path(s)')
+    parser.add_argument('--source1', type=str, default='FLIR-align-3class/visible/test/', help='source')  # file/folder, 0 for webcam
+    parser.add_argument('--source2', type=str, default='FLIR-align-3class/infrared/test/', help='source')  # file/folder, 0 for webcam
     parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.1, help='object confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.5, help='IOU threshold for NMS')
