@@ -1,23 +1,23 @@
-# COCO 2017 dataset http://cocodataset.org - first 128 training images
-# Train command: python train.py --data coco128.yaml
-# Default dataset location is next to YOLOv5:
+# COCO 2017 dataset http://cocodataset.org - 前128张训练图像
+# 训练命令: python train.py --data coco128.yaml
+# 默认数据集位置位于 YOLOv5 的同级目录:
 #   /parent_folder
 #     /coco128
 #     /yolov5
 
 
-# download command/URL (optional)
+# 数据集下载链接
 download: https://github.com/ultralytics/yolov5/releases/download/v1.0/coco128.zip
 
-# train and val data as 1) directory: path/images/, 2) file: path/images.txt, or 3) list: [path1/images/, path2/images/]
-path: /home/shen/Chenyf/CVC14
-train_rgb: /home/shen/Chenyf/CVC14/visible/train  # 128 images
-val_rgb: /home/shen/Chenyf/CVC14/visible/test  # 128 images
-train_ir: /home/shen/Chenyf/CVC14/infrared/train  # 128 images
-val_ir: /home/shen/Chenyf/CVC14/infrared/test  # 128 images
+# 训练和验证数据的路径，可以是 1) 文件夹路径：path/images/，2) 文件路径：path/images.txt，或 3) 列表：[path1/images/, path2/images/]
+path: /home/shen/Chenyf/CVC14  # 数据集根目录
+train_rgb: /home/shen/Chenyf/CVC14/visible/train  # 可见光训练集路径（包含 128 张图像）
+val_rgb: /home/shen/Chenyf/CVC14/visible/test  # 可见光验证集路径（包含 128 张图像）
+train_ir: /home/shen/Chenyf/CVC14/infrared/train  # 红外光训练集路径（包含 128 张图像）
+val_ir: /home/shen/Chenyf/CVC14/infrared/test  # 红外光验证集路径（包含 128 张图像）
 
-# number of classes
+# 数据集的类别数量
 nc: 1
 
-# class names
+# 数据集的类别名称
 names: ['person']
