@@ -1,8 +1,8 @@
 #!/bin/bash
 # PASCAL VOC dataset http://host.robots.ox.ac.uk/pascal/VOC/
-# Download command: bash data/scripts/get_voc.sh
-# Train command: python train.py --data voc.yaml
-# Default dataset location is next to YOLOv5:
+# 下载命令: bash data/scripts/get_voc.sh
+# 训练命令: python train.py --data voc.yaml
+# 默认数据集位置位于 YOLOv5 的同级目录:
 #   /parent_folder
 #     /VOC
 #     /yolov5
@@ -11,8 +11,8 @@ start=$(date +%s)
 mkdir -p ../tmp
 cd ../tmp/
 
-# Download/unzip images and labels
-d='.' # unzip directory
+# 下载/解压图片和标签
+d='.' # 解压路径
 url=https://github.com/ultralytics/yolov5/releases/download/v1.0/
 f1=VOCtrainval_06-Nov-2007.zip # 446MB, 5012 images
 f2=VOCtest_06-Nov-2007.zip     # 438MB, 4953 images

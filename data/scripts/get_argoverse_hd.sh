@@ -1,14 +1,14 @@
 #!/bin/bash
 # Argoverse-HD dataset (ring-front-center camera) http://www.cs.cmu.edu/~mengtial/proj/streaming/
-# Download command: bash data/scripts/get_argoverse_hd.sh
-# Train command: python train.py --data argoverse_hd.yaml
-# Default dataset location is next to YOLOv5:
+# 下载命令: bash data/scripts/get_argoverse_hd.sh
+# 训练命令: python train.py --data argoverse_hd.yaml
+# 默认数据集位置位于 YOLOv5 的同级目录:
 #   /parent_folder
 #     /argoverse
 #     /yolov5
 
-# Download/unzip images
-d='../argoverse/' # unzip directory
+# 下载/解压图片
+d='../argoverse/' # 解压路径
 mkdir $d
 url=https://argoverse-hd.s3.us-east-2.amazonaws.com/
 f=Argoverse-HD-Full.zip
