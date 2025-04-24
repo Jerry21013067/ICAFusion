@@ -182,56 +182,48 @@ createApp({
         })
     },
     methods: {
+        showUserCenter() {
+            console.log('显示个人中心');
+            this.showingHome = false;
+            this.showingUserCenter = true;
+            this.userCenterTab = 'info';
+            this.adminCenterTab = 'info';
+            // 如果是管理员，加载管理员需要的数据
+            if (this.currentUser && this.currentUser.is_admin) {
+                this.loadAllUsers();
+                this.loadAllRecords();
+            } else {
+                // 如果是普通用户，加载检测记录
+                this.loadDetectionRecords();
+            }
+        },
+        showAdminCenter() {
+            console.log('显示管理员中心');
+            this.showingHome = false;
+            this.showingUserCenter = true;
+            this.userCenterTab = 'info';
+            this.adminCenterTab = 'info';
+            // 加载管理员需要的数据
+            this.loadAllUsers();
+            this.loadAllRecords();
+        },
+        showRecords() {
+            console.log('显示检测记录');
+            this.showingHome = false;
+            this.showingUserCenter = true;
+            this.userCenterTab = 'records';
+            this.loadDetectionRecords();
+        },
         showHome() {
-            this.showingUserCenter = false;
+            console.log('显示首页');
             this.showingHome = true;
-            this.isAdmin = false;
-            // 清除已上传的图片
-            this.visibleImage = null;
-            this.infraredImage = null;
-            this.resultImage = null;
-            this.detectionDetails = [];
-            this.canSubmit = false;
-            this.isProcessing = false;
-            this.visiblePreview = null;
-            this.infraredPreview = null;
-            this.resultImagePreview = null;
-            // 清除文件输入框的值
-            const visibleInput = document.getElementById('visible-image');
-            const infraredInput = document.getElementById('infrared-image');
-            if (visibleInput) visibleInput.value = '';
-            if (infraredInput) infraredInput.value = '';
+            this.showingUserCenter = false;
         },
         showLoginModal() {
             this.loginModal.show()
         },
         showRegisterModal() {
             this.registerModal.show()
-        },
-        showUserCenter() {
-            this.showingUserCenter = true;
-            this.showingHome = false;
-            this.showingLogin = false;
-            this.showingRegister = false;
-            
-            // 加载用户数据
-            this.loadUserData();
-            
-            // 如果是管理员，加载所有用户和检测记录
-            if (this.currentUser && this.currentUser.is_admin) {
-                this.loadAllUsers();
-                this.loadAllRecords();
-            }
-            
-            // 初始化检测详情模态框
-            this.$nextTick(() => {
-                const modalElement = document.getElementById('detectionDetailsModal')
-                if (modalElement) {
-                    this.detectionDetailsModal = new bootstrap.Modal(modalElement)
-                } else {
-                    console.error('检测详情模态框元素未找到')
-                }
-            })
         },
         hideUserCenter() {
             this.showingUserCenter = false;
@@ -523,15 +515,17 @@ createApp({
         // 监听标签页切换
         watch: {
             userCenterTab(newTab) {
+                console.log('个人中心标签页切换:', newTab);
                 if (newTab === 'records') {
-                    this.$nextTick(() => {
-                        const modalElement = document.getElementById('detectionDetailsModal')
-                        if (modalElement) {
-                            this.detectionDetailsModal = new bootstrap.Modal(modalElement)
-                        } else {
-                            console.error('检测详情模态框元素未找到')
-                        }
-                    })
+                    this.loadDetectionRecords();
+                }
+            },
+            adminCenterTab(newTab) {
+                console.log('管理员中心标签页切换:', newTab);
+                if (newTab === 'users') {
+                    this.loadAllUsers();
+                } else if (newTab === 'records') {
+                    this.loadAllRecords();
                 }
             }
         },

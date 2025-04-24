@@ -53,4 +53,95 @@ body {
     max-width: 100%;
     height: auto;
     border-radius: 0.25rem;
+}
+
+.welcome-section {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+}
+
+.welcome-card {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.welcome-card h1 {
+    color: #2c3e50;
+    font-weight: 600;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+    font-size: 2rem;
+}
+
+.welcome-card p {
+    color: #34495e;
+    font-size: 1rem;
+    line-height: 1.6;
+}
+
+.btn-primary {
+    background-color: #3498db;
+    border-color: #3498db;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+    border-color: #2980b9;
+    transform: translateY(-2px);
+}
+
+.btn-outline-primary {
+    color: #3498db;
+    border-color: #3498db;
+    transition: all 0.3s ease;
+}
+
+.btn-outline-primary:hover {
+    background-color: #3498db;
+    border-color: #3498db;
+    transform: translateY(-2px);
+}
+
+/* 添加图标样式 */
+.bi {
+    vertical-align: -0.125em;
+}
+
+/* 调整按钮图标和文字的间距 */
+.btn i {
+    margin-right: 0.5rem;
+}
+
+/* 确保按钮内容完全居中 */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+    padding: 0.5rem 1.5rem;
+}
+
+/* 特别调整欢迎页面的按钮 */
+.welcome-card .btn {
+    min-width: 120px;
+    padding: 0.5rem 1.5rem;
+}
+
+/* 调整欢迎页面按钮内部内容 */
+.welcome-card .btn i {
+    position: absolute;
+    left: 1rem;
+}
+
+.welcome-card .btn span {
+    margin-left: 1.5rem;
+}
+
+/* 调整欢迎页面按钮容器 */
+.welcome-card .d-flex {
+    margin: 0 -0.5rem;
 } 
