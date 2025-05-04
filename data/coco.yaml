@@ -1,23 +1,23 @@
 # COCO 2017 dataset http://cocodataset.org
-# Train command: python train.py --data coco.yaml
-# Default dataset location is next to YOLOv5:
+# 训练命令: python train.py --data coco.yaml
+# 默认数据集位置位于 YOLOv5 的同级目录:
 #   /parent_folder
 #     /coco
 #     /yolov5
 
 
-# download command/URL (optional)
+# 数据集下载链接
 download: bash data/scripts/get_coco.sh
 
-# train and val data as 1) directory: path/images/, 2) file: path/images.txt, or 3) list: [path1/images/, path2/images/]
+# 训练和验证数据的路径，可以是 1) 文件夹路径：path/images/，2) 文件路径：path/images.txt，或 3) 列表：[path1/images/, path2/images/]
 train: ../coco/train2017.txt  # 118287 images
 val: ../coco/val2017.txt  # 5000 images
 test: ../coco/test-dev2017.txt  # 20288 of 40670 images, submit to https://competitions.codalab.org/competitions/20794
 
-# number of classes
+# 数据集的类别数量
 nc: 80
 
-# class names
+# 数据集的类别名称
 names: [ 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
          'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
          'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',

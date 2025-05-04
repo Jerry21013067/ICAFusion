@@ -1,33 +1,33 @@
-# Hyperparameters for COCO training from scratch
-# python train.py --batch 40 --cfg yolov5m.yaml --weights '' --data coco.yaml --img 640 --epochs 300
-# See tutorials for hyperparameter evolution https://github.com/ultralytics/yolov5#tutorials
+# COCO 数据集从零开始训练的超参数配置
+# 训练命令： python train.py --batch 40 --cfg yolov5m.yaml --weights '' --data coco.yaml --img 640 --epochs 300
+# 关于超参数演化的教程，请参考： https://github.com/ultralytics/yolov5#tutorials
 
 
-lr0: 0.01  # initial learning rate ( original SGD=1E-2, Adam=1E-3)
-lrf: 0.1  # final OneCycleLR learning rate (lr0 * lrf)
-momentum: 0.937  # SGD momentum/Adam beta1
-weight_decay: 0.0005  # optimizer weight decay 5e-4
-warmup_epochs: 3.0  # warmup epochs (fractions ok)
-warmup_momentum: 0.8  # warmup initial momentum
-warmup_bias_lr: 0.1  # warmup initial bias lr
-box: 0.05  # box loss gain
-cls: 0.5  # cls loss gain
-cls_pw: 1.0  # cls BCELoss positive_weight
-obj: 1.0  # obj loss gain (scale with pixels)
-obj_pw: 1.0  # obj BCELoss positive_weight
-iou_t: 0.20  # IoU training threshold
-anchor_t: 4.0  # anchor-multiple threshold
-# anchors: 3  # anchors per output layer (0 to ignore)
-fl_gamma: 0.0  # focal loss gamma (efficientDet default gamma=1.5)
-hsv_h: 0.015  # image HSV-Hue augmentation (fraction)
-hsv_s: 0.7  # image HSV-Saturation augmentation (fraction)
-hsv_v: 0.4  # image HSV-Value augmentation (fraction)
-degrees: 0.0  # image rotation (+/- deg)
-translate: 0.1  # image translation (+/- fraction)
-scale: 0.5  # image scale (+/- gain)
-shear: 0.0  # image shear (+/- deg)
-perspective: 0.0  # image perspective (+/- fraction), range 0-0.001
-flipud: 0.0  # image flip up-down (probability)
-fliplr: 0.5  # image flip left-right (probability)
-mosaic: 1.0  # image mosaic (probability)
-mixup: 0.0  # image mixup (probability)
+lr0: 0.01  # 初始学习率 (原始 SGD=1E-2, Adam=1E-3)
+lrf: 0.1  # 最终 OneCycleLR 学习率 (lr0 * lrf)
+momentum: 0.937  # SGD 动量/Adam beta1
+weight_decay: 0.0005  # 优化器权重衰减 5e-4
+warmup_epochs: 3.0  # 预热轮数 (可以是分数)
+warmup_momentum: 0.8  # 预热初始动量
+warmup_bias_lr: 0.1  # 预热初始偏置学习率
+box: 0.05  # 边界框损失权重
+cls: 0.5  # 分类损失权重
+cls_pw: 1.0  # 分类 BCELoss 正样本权重
+obj: 1.0  # 目标损失权重 (与像素成比例)
+obj_pw: 1.0  # 目标 BCELoss 正样本权重
+iou_t: 0.20  # IoU 训练阈值
+anchor_t: 4.0  # 锚点倍数阈值
+# Focal Loss 的 gamma 参数
+fl_gamma: 0.0  # Focal Loss gamma (efficientDet 默认 gamma=1.5)
+hsv_h: 0.015  # 图像 HSV-Hue 增强 (比例)
+hsv_s: 0.7  # 图像 HSV-Saturation 增强 (比例)
+hsv_v: 0.4  # 图像 HSV-Value 增强 (比例)
+degrees: 0.0  # 图像旋转 (+/- 度数)
+translate: 0.1  # 图像平移 (+/- 比例)
+scale: 0.5  # 图像缩放 (+/- 增益)
+shear: 0.0  # 图像剪切 (+/- 度数)
+perspective: 0.0  # 图像透视变换 (+/- 比例)，范围 0-0.001
+flipud: 0.0  # 图像上下翻转 (概率)
+fliplr: 0.5  # 图像左右翻转 (概率)
+mosaic: 1.0  # 图像拼接 (概率)
+mixup: 0.0  # 图像混合 (概率)

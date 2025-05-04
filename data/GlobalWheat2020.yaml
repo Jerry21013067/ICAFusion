@@ -1,14 +1,14 @@
-# Global Wheat 2020 dataset http://www.global-wheat.com/
-# Train command: python train.py --data GlobalWheat2020.yaml
-# Default dataset location is next to YOLOv5:
+# Global Wheat 2020 数据集 http://www.global-wheat.com/
+# 训练命令: python train.py --data GlobalWheat2020.yaml
+# 默认数据集位置位于 YOLOv5 的同级目录:
 #   /parent_folder
 #     /datasets/GlobalWheat2020
 #     /yolov5
 
 
-# train and val data as 1) directory: path/images/, 2) file: path/images.txt, or 3) list: [path1/images/, path2/images/]
-train: # 3422 images
-  - ../datasets/GlobalWheat2020/images/arvalis_1
+# 训练和验证数据的路径，可以是 1) 文件夹路径：path/images/，2) 文件路径：path/images.txt，或 3) 列表：[path1/images/, path2/images/]
+train: # 3422 张训练图像
+  - ../datasets/GlobalWheat2020/images/arvalis_1  # 训练集图像路径
   - ../datasets/GlobalWheat2020/images/arvalis_2
   - ../datasets/GlobalWheat2020/images/arvalis_3
   - ../datasets/GlobalWheat2020/images/ethz_1
@@ -16,40 +16,40 @@ train: # 3422 images
   - ../datasets/GlobalWheat2020/images/inrae_1
   - ../datasets/GlobalWheat2020/images/usask_1
 
-val: # 748 images (WARNING: train set contains ethz_1)
+val: # 748 张验证图像（注意：训练集中包含 ethz_1）
   - ../datasets/GlobalWheat2020/images/ethz_1
 
-test: # 1276
+test: # 1276 张测试图像
   - ../datasets/GlobalWheat2020/images/utokyo_1
   - ../datasets/GlobalWheat2020/images/utokyo_2
   - ../datasets/GlobalWheat2020/images/nau_1
   - ../datasets/GlobalWheat2020/images/uq_1
 
-# number of classes
+# 数据集的类别数量
 nc: 1
 
-# class names
+# 数据集的类别名称
 names: [ 'wheat_head' ]
 
 
-# download command/URL (optional) --------------------------------------------------------------------------------------
+# 数据集下载链接
 download: |
   from utils.general import download, Path
 
-  # Download
-  dir = Path('../datasets/GlobalWheat2020')  # dataset directory
-  urls = ['https://zenodo.org/record/4298502/files/global-wheat-codalab-official.zip',
-          'https://github.com/ultralytics/yolov5/releases/download/v1.0/GlobalWheat2020_labels.zip']
+  # 下载数据集
+  dir = Path('../datasets/GlobalWheat2020')  # 数据集目录
+  urls = ['https://zenodo.org/record/4298502/files/global-wheat-codalab-official.zip',  # 数据集下载链接
+          'https://github.com/ultralytics/yolov5/releases/download/v1.0/GlobalWheat2020_labels.zip']  # 标签下载链接
   download(urls, dir=dir)
 
-  # Make Directories
+  # 创建目录结构
   for p in 'annotations', 'images', 'labels':
       (dir / p).mkdir(parents=True, exist_ok=True)
 
-  # Move
+  # 移动文件到指定目录
   for p in 'arvalis_1', 'arvalis_2', 'arvalis_3', 'ethz_1', 'rres_1', 'inrae_1', 'usask_1', \
            'utokyo_1', 'utokyo_2', 'nau_1', 'uq_1':
-      (dir / p).rename(dir / 'images' / p)  # move to /images
-      f = (dir / p).with_suffix('.json')  # json file
+      (dir / p).rename(dir / 'images' / p)  # 将图像文件夹移动到 images 目录
+      f = (dir / p).with_suffix('.json')  # 对应的 JSON 文件
       if f.exists():
-          f.rename((dir / 'annotations' / p).with_suffix('.json'))  # move to /annotations
+          f.rename((dir / 'annotations' / p).with_suffix('.json'))  # 将 JSON 文件移动到 annotations 目录

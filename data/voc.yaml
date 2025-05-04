@@ -1,21 +1,21 @@
-# PASCAL VOC dataset http://host.robots.ox.ac.uk/pascal/VOC/
-# Train command: python train.py --data voc.yaml
-# Default dataset location is next to YOLOv5:
+# PASCAL VOC 数据集 http://host.robots.ox.ac.uk/pascal/VOC/
+# 训练命令： python train.py --data voc.yaml
+# 默认数据集位置位于 YOLOv5 的同级目录：
 #   /parent_folder
 #     /VOC
 #     /yolov5
 
 
-# download command/URL (optional)
-download: bash data/scripts/get_voc.sh
+# 数据集下载命令/URL (可选)
+download: bash data/scripts/get_voc.sh  # 下载脚本路径
 
-# train and val data as 1) directory: path/images/, 2) file: path/images.txt, or 3) list: [path1/images/, path2/images/]
-train: ../VOC/images/train/  # 16551 images
-val: ../VOC/images/val/  # 4952 images
+# 训练和验证数据的路径，可以是 1) 文件夹路径：path/images/，2) 文件路径：path/images.txt，或 3) 列表：[path1/images/, path2/images/]
+train: ../VOC/images/train/  # 训练集图像路径，包含 16551 张图像
+val: ../VOC/images/val/  # 验证集图像路径，包含 4952 张图像
 
-# number of classes
-nc: 20
+# 数据集的类别数量
+nc: 20  # PASCAL VOC 数据集包含 20 个类别
 
-# class names
+# 数据集的类别名称
 names: [ 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable', 'dog',
          'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor' ]
