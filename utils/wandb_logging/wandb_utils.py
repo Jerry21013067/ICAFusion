@@ -6,7 +6,8 @@ import torch
 import yaml
 from tqdm import tqdm
 
-sys.path.append(str(Path(__file__).parent.parent.parent))  # add utils/ to path
+# 将当前文件的父目录的父目录的父目录添加到系统路径中，以便导入自定义模块
+sys.path.append(str(Path(__file__).parent.parent.parent))
 from utils.datasets import LoadImagesAndLabels
 from utils.datasets import img2label_paths
 from utils.general import colorstr, xywh2xyxy, check_dataset
@@ -17,20 +18,21 @@ try:
 except ImportError:
     wandb = None
 
+# 定义Wandb数据集工件的前缀
 WANDB_ARTIFACT_PREFIX = 'wandb-artifact://'
 
-
+# 定义移除前缀的函数
 def remove_prefix(from_string, prefix=WANDB_ARTIFACT_PREFIX):
     return from_string[len(prefix):]
 
-
+# 检查Wandb配置文件是否存在
 def check_wandb_config_file(data_config_file):
-    wandb_config = '_wandb.'.join(data_config_file.rsplit('.', 1))  # updated data.yaml path
+    wandb_config = '_wandb.'.join(data_config_file.rsplit('.', 1))  # 更新后的数据配置文件路径
     if Path(wandb_config).is_file():
         return wandb_config
     return data_config_file
 
-
+# 获取Wandb运行信息
 def get_run_info(run_path):
     run_path = Path(remove_prefix(run_path, WANDB_ARTIFACT_PREFIX))
     run_id = run_path.stem
@@ -38,12 +40,12 @@ def get_run_info(run_path):
     model_artifact_name = 'run_' + run_id + '_model'
     return run_id, project, model_artifact_name
 
-
+# 检查是否需要从Wandb恢复训练
 def check_wandb_resume(opt):
     process_wandb_config_ddp_mode(opt) if opt.global_rank not in [-1, 0] else None
     if isinstance(opt.resume, str):
         if opt.resume.startswith(WANDB_ARTIFACT_PREFIX):
-            if opt.global_rank not in [-1, 0]:  # For resuming DDP runs
+            if opt.global_rank not in [-1, 0]:  # 对于DDP模式的恢复
                 run_id, project, model_artifact_name = get_run_info(opt.resume)
                 api = wandb.Api()
                 artifact = api.artifact(project + '/' + model_artifact_name + ':latest')
@@ -52,10 +54,10 @@ def check_wandb_resume(opt):
             return True
     return None
 
-
+# 处理DDP模式下的Wandb配置
 def process_wandb_config_ddp_mode(opt):
     with open(opt.data) as f:
-        data_dict = yaml.safe_load(f)  # data dict
+        data_dict = yaml.safe_load(f)  # 数据字典
     train_dir, val_dir = None, None
     if isinstance(data_dict['train'], str) and data_dict['train'].startswith(WANDB_ARTIFACT_PREFIX):
         api = wandb.Api()
@@ -76,14 +78,13 @@ def process_wandb_config_ddp_mode(opt):
             yaml.safe_dump(data_dict, f)
         opt.data = ddp_data_path
 
-
+# 定义WandbLogger类
 class WandbLogger():
     def __init__(self, opt, name, run_id, data_dict, job_type='Training'):
-        # Pre-training routine --
+        # 预训练例程
         self.job_type = job_type
         self.wandb, self.wandb_run, self.data_dict = wandb, None if not wandb else wandb.run, data_dict
-        # It's more elegant to stick to 1 wandb.init call, but useful config data is overwritten in the WandbLogger's wandb.init call
-        if isinstance(opt.resume, str):  # checks resume from artifact
+        if isinstance(opt.resume, str):  # 检查是否从工件恢复
             if opt.resume.startswith(WANDB_ARTIFACT_PREFIX):
                 run_id, project, model_artifact_name = get_run_info(opt.resume)
                 model_artifact_name = WANDB_ARTIFACT_PREFIX + model_artifact_name
@@ -102,7 +103,7 @@ class WandbLogger():
             if self.job_type == 'Training':
                 if not opt.resume:
                     wandb_data_dict = self.check_and_upload_dataset(opt) if opt.upload_dataset else data_dict
-                    # Info useful for resuming from artifacts
+                    # 用于恢复的有用信息
                     self.wandb_run.config.opt = vars(opt)
                     self.wandb_run.config.data_dict = wandb_data_dict
                 self.data_dict = self.setup_training(opt, data_dict)
@@ -124,7 +125,7 @@ class WandbLogger():
         return wandb_data_dict
 
     def setup_training(self, opt, data_dict):
-        self.log_dict, self.current_epoch, self.log_imgs = {}, 0, 16  # Logging Constants
+        self.log_dict, self.current_epoch, self.log_imgs = {}, 0, 16  # 日志常量
         self.bbox_interval = opt.bbox_interval
         if isinstance(opt.resume, str):
             modeldir, _ = self.download_model_artifact(opt)
@@ -134,8 +135,8 @@ class WandbLogger():
                 opt.weights, opt.save_period, opt.batch_size, opt.bbox_interval, opt.epochs, opt.hyp = str(
                     self.weights), config.save_period, config.total_batch_size, config.bbox_interval, config.epochs, \
                                                                                                        config.opt['hyp']
-            data_dict = dict(self.wandb_run.config.data_dict)  # eliminates the need for config file to resume
-        if 'val_artifact' not in self.__dict__:  # If --upload_dataset is set, use the existing artifact, don't download
+            data_dict = dict(self.wandb_run.config.data_dict)  # 恢复时无需配置文件
+        if 'val_artifact' not in self.__dict__:  # 如果设置了--upload_dataset，则使用现有工件，不下载
             self.train_artifact_path, self.train_artifact = self.download_dataset_artifact(data_dict.get('train'),
                                                                                            opt.artifact_alias)
             self.val_artifact_path, self.val_artifact = self.download_dataset_artifact(data_dict.get('val'),
@@ -192,9 +193,9 @@ class WandbLogger():
 
     def log_dataset_artifact(self, data_file, single_cls, project, overwrite_config=False):
         with open(data_file) as f:
-            data = yaml.safe_load(f)  # data dict
+            data = yaml.safe_load(f)  # 数据字典
         nc, names = (1, ['item']) if single_cls else (int(data['nc']), data['names'])
-        names = {k: v for k, v in enumerate(names)}  # to index dictionary
+        names = {k: v for k, v in enumerate(names)}  # 索引字典
         self.train_artifact = self.create_dataset_table(LoadImagesAndLabels(
             data['train']), names, name='train') if data.get('train') else None
         self.val_artifact = self.create_dataset_table(LoadImagesAndLabels(
@@ -203,12 +204,12 @@ class WandbLogger():
             data['train'] = WANDB_ARTIFACT_PREFIX + str(Path(project) / 'train')
         if data.get('val'):
             data['val'] = WANDB_ARTIFACT_PREFIX + str(Path(project) / 'val')
-        path = data_file if overwrite_config else '_wandb.'.join(data_file.rsplit('.', 1))  # updated data.yaml path
+        path = data_file if overwrite_config else '_wandb.'.join(data_file.rsplit('.', 1))  # 更新后的数据配置文件路径
         data.pop('download', None)
         with open(path, 'w') as f:
             yaml.safe_dump(data, f)
 
-        if self.job_type == 'Training':  # builds correct artifact pipeline graph
+        if self.job_type == 'Training':  # 构建正确的工件管道图
             self.wandb_run.use_artifact(self.val_artifact)
             self.wandb_run.use_artifact(self.train_artifact)
             self.val_artifact.wait()
@@ -226,7 +227,7 @@ class WandbLogger():
             self.val_table_map[data[3]] = data[0]
 
     def create_dataset_table(self, dataset, class_to_id, name='dataset'):
-        # TODO: Explore multiprocessing to slpit this loop parallely| This is essential for speeding up the the logging
+        # TODO: 探索多进程以并行拆分此循环|这对于加速日志记录至关重要
         artifact = wandb.Artifact(name=name, type="dataset")
         img_files = tqdm([dataset.path]) if isinstance(dataset.path, str) and Path(dataset.path).is_dir() else None
         img_files = tqdm(dataset.img_files) if not img_files else img_files
@@ -254,7 +255,7 @@ class WandbLogger():
                                  "scores": {"acc": 1},
                                  "domain": "pixel"})
                 img_classes[cls] = class_to_id[cls]
-            boxes = {"ground_truth": {"box_data": box_data, "class_labels": class_to_id}}  # inference-space
+            boxes = {"ground_truth": {"box_data": box_data, "class_labels": class_to_id}}  # 推理空间
             table.add_data(si, wandb.Image(paths, classes=class_set, boxes=boxes), json.dumps(img_classes),
                            Path(paths).name)
         artifact.add(table, name)
@@ -274,7 +275,7 @@ class WandbLogger():
                          "scores": {"class_score": conf},
                          "domain": "pixel"})
                     total_conf = total_conf + conf
-            boxes = {"predictions": {"box_data": box_data, "class_labels": names}}  # inference-space
+            boxes = {"predictions": {"box_data": box_data, "class_labels": names}}  # 推理空间
             id = self.val_table_map[Path(path).name]
             self.result_table.add_data(self.current_epoch,
                                        id,

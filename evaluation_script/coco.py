@@ -64,32 +64,37 @@ elif PYTHON_VERSION == 3:
 
 
 def _isArrayLike(obj):
+    """
+    检查对象是否为数组类型。
+    :param obj: 输入对象
+    :return: 如果对象为数组类型，则返回True，否则返回False
+    """
     return hasattr(obj, '__iter__') and hasattr(obj, '__len__')
 
 
 class COCO:
     def __init__(self, annotation_file=None):
         """
-        Constructor of Microsoft COCO helper class for reading and visualizing annotations.
-        :param annotation_file (str): location of annotation file
-        :param image_folder (str): location to the folder that hosts images.
-        :return:
+        Microsoft COCO 数据集的辅助类，用于加载和解析注释文件。
+        :param annotation_file: 注释文件路径
         """
-        # load dataset
+        # 加载数据集
         self.dataset,self.anns,self.cats,self.imgs = dict(),dict(),dict(),dict()
         self.imgToAnns, self.catToImgs = defaultdict(list), defaultdict(list)
         if not annotation_file == None:
-            #print('loading annotations into memory...')
+            # 加载注释文件到内存
             tic = time.time()
             dataset = json.load(open(annotation_file, 'r'))
             assert type(dataset)==dict, 'annotation file format {} not supported'.format(type(dataset))
-            #print('Done (t={:0.2f}s)'.format(time.time()- tic))
+            # 创建索引
             self.dataset = dataset
             self.createIndex()
 
     def createIndex(self):
-        # create index
-        #print('creating index...')
+        """
+        创建数据集的索引。
+        """
+        # 创建索引
         anns, cats, imgs = {}, {}, {}
         imgToAnns,catToImgs = defaultdict(list), defaultdict(list)
         if 'annotations' in self.dataset:
@@ -109,9 +114,7 @@ class COCO:
             for ann in self.dataset['annotations']:
                 catToImgs[ann['category_id']].append(ann['image_id'])
 
-        #print('index created!')
-
-        # create class members
+        # 创建类成员
         self.anns = anns
         self.imgToAnns = imgToAnns
         self.catToImgs = catToImgs
@@ -120,20 +123,19 @@ class COCO:
 
     def info(self):
         """
-        Print information about the annotation file.
-        :return:
+        打印注释文件的信息。
         """
         for key, value in self.dataset['info'].items():
             print('{}: {}'.format(key, value))
 
     def getAnnIds(self, imgIds=[], catIds=[], areaRng=[], iscrowd=None):
         """
-        Get ann ids that satisfy given filter conditions. default skips that filter
-        :param imgIds  (int array)     : get anns for given imgs
-               catIds  (int array)     : get anns for given cats
-               areaRng (float array)   : get anns for given area range (e.g. [0 inf])
-               iscrowd (boolean)       : get anns for given crowd label (False or True)
-        :return: ids (int array)       : integer array of ann ids
+        获取满足给定筛选条件的注释ID。
+        :param imgIds: 图像ID列表
+        :param catIds: 类别ID列表
+        :param areaRng: 面积范围
+        :param iscrowd: 是否为拥挤注释
+        :return: 注释ID列表
         """
         imgIds = imgIds if _isArrayLike(imgIds) else [imgIds]
         catIds = catIds if _isArrayLike(catIds) else [catIds]
@@ -156,11 +158,11 @@ class COCO:
 
     def getCatIds(self, catNms=[], supNms=[], catIds=[]):
         """
-        filtering parameters. default skips that filter.
-        :param catNms (str array)  : get cats for given cat names
-        :param supNms (str array)  : get cats for given supercategory names
-        :param catIds (int array)  : get cats for given cat ids
-        :return: ids (int array)   : integer array of cat ids
+        获取满足给定筛选条件的类别ID。
+        :param catNms: 类别名称列表
+        :param supNms: 超类别名称列表
+        :param catIds: 类别ID列表
+        :return: 类别ID列表
         """
         catNms = catNms if _isArrayLike(catNms) else [catNms]
         supNms = supNms if _isArrayLike(supNms) else [supNms]
@@ -177,12 +179,12 @@ class COCO:
         return ids
 
     def getImgIds(self, imgIds=[], catIds=[]):
-        '''
-        Get img ids that satisfy given filter conditions.
-        :param imgIds (int array) : get imgs for given ids
-        :param catIds (int array) : get imgs with all given cats
-        :return: ids (int array)  : integer array of img ids
-        '''
+        """
+        获取满足给定筛选条件的图像ID。
+        :param imgIds: 图像ID列表
+        :param catIds: 类别ID列表
+        :return: 图像ID列表
+        """
         imgIds = imgIds if _isArrayLike(imgIds) else [imgIds]
         catIds = catIds if _isArrayLike(catIds) else [catIds]
 
@@ -199,9 +201,9 @@ class COCO:
 
     def loadAnns(self, ids=[]):
         """
-        Load anns with the specified ids.
-        :param ids (int array)       : integer ids specifying anns
-        :return: anns (object array) : loaded ann objects
+        加载指定ID的注释。
+        :param ids: 注释ID列表
+        :return: 加载的注释对象列表
         """
         if _isArrayLike(ids):
             return [self.anns[id] for id in ids]
@@ -210,9 +212,9 @@ class COCO:
 
     def loadCats(self, ids=[]):
         """
-        Load cats with the specified ids.
-        :param ids (int array)       : integer ids specifying cats
-        :return: cats (object array) : loaded cat objects
+        加载指定ID的类别。
+        :param ids: 类别ID列表
+        :return: 加载的类别对象列表
         """
         if _isArrayLike(ids):
             return [self.cats[id] for id in ids]
@@ -221,9 +223,9 @@ class COCO:
 
     def loadImgs(self, ids=[]):
         """
-        Load anns with the specified ids.
-        :param ids (int array)       : integer ids specifying img
-        :return: imgs (object array) : loaded img objects
+        加载指定ID的图像。
+        :param ids: 图像ID列表
+        :return: 加载的图像对象列表
         """
         if _isArrayLike(ids):
             return [self.imgs[id] for id in ids]
@@ -232,9 +234,9 @@ class COCO:
 
     def showAnns(self, anns, draw_bbox=False):
         """
-        Display the specified annotations.
-        :param anns (array of object): annotations to display
-        :return: None
+        显示指定的注释。
+        :param anns: 注释对象列表
+        :param draw_bbox: 是否绘制边界框
         """
         if len(anns) == 0:
             return 0
@@ -304,9 +306,9 @@ class COCO:
 
     def loadRes(self, resFile):
         """
-        Load result file and return a result api object.
-        :param   resFile (str)     : file name of result file
-        :return: res (obj)         : result api object
+        加载结果文件并返回一个结果API对象。
+        :param resFile: 结果文件路径
+        :return: 结果API对象
         """
         res = COCO()
         res.dataset['images'] = [img for img in self.dataset['images']]
@@ -364,12 +366,11 @@ class COCO:
         return res
 
     def download(self, tarDir = None, imgIds = [] ):
-        '''
-        Download COCO images from mscoco.org server.
-        :param tarDir (str): COCO results directory name
-               imgIds (list): images to be downloaded
-        :return:
-        '''
+        """
+        从mscoco.org服务器下载COCO图像。
+        :param tarDir: 目标目录
+        :param imgIds: 要下载的图像ID列表
+        """
         if tarDir is None:
             print('Please specify target directory')
             return -1
@@ -389,9 +390,9 @@ class COCO:
 
     def loadNumpyAnnotations(self, data):
         """
-        Convert result data from a numpy array [Nx7] where each row contains {imageID,x1,y1,w,h,score,class}
-        :param  data (numpy.ndarray)
-        :return: annotations (python nested list)
+        将结果数据从numpy数组[Nx7]转换为列表，其中每一行包含{imageID,x1,y1,w,h,score,class}
+        :param data: numpy数组
+        :return: 注释列表
         """
         print('Converting ndarray to lists...')
         assert(type(data) == np.ndarray)
@@ -412,8 +413,8 @@ class COCO:
 
     def annToRLE(self, ann):
         """
-        Convert annotation which can be polygons, uncompressed RLE to RLE.
-        :return: binary mask (numpy 2D array)
+        将注释（可以是多边形、未压缩的RLE）转换为RLE。
+        :return: 二进制掩码（numpy 2D数组）
         """
         t = self.imgs[ann['image_id']]
         h, w = t['height'], t['width']
@@ -433,8 +434,8 @@ class COCO:
 
     def annToMask(self, ann):
         """
-        Convert annotation which can be polygons, uncompressed RLE, or RLE to binary mask.
-        :return: binary mask (numpy 2D array)
+        将注释（可以是多边形、未压缩的RLE或RLE）转换为二进制掩码。
+        :return: 二进制掩码（numpy 2D数组）
         """
         rle = self.annToRLE(ann)
         m = maskUtils.decode(rle)

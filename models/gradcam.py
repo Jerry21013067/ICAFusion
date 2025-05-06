@@ -22,17 +22,33 @@ def find_yolo_layer(model, layer_name):
 
 
 class YOLOV5GradCAM:
-
+    """
+    YOLOv5模型的GradCAM和GradCAM++实现类
+    """
     def __init__(self, model, layer_name, img_size=(640, 640)):
+        """
+        初始化YOLOV5GradCAM类
+
+        参数：
+            model: YOLOv5模型。
+            layer_name: 要计算GradCAM的目标层名称。
+            img_size: 输入图像的大小，默认为(640, 640)。
+        """
         self.model = model
         self.gradients = dict()
         self.activations = dict()
 
         def backward_hook(module, grad_input, grad_output):
+            """
+            反向传播钩子函数，用于捕获梯度值
+            """
             self.gradients['value'] = grad_output[0]
             return None
 
         def forward_hook(module, input, output):
+            """
+            前向传播钩子函数，用于捕获激活值
+            """
             self.activations['value'] = output
             return None
 
@@ -46,12 +62,17 @@ class YOLOV5GradCAM:
 
     def forward(self, img_vis, img_ir, class_idx=True):
         """
-        Args:
-            input_img: input image with shape of (1, 3, H, W)
-        Return:
-            mask: saliency map of the same spatial dimension with input
-            logit: model output
-            preds: The object predictions
+        前向传播函数，计算GradCAM和GradCAM++
+
+        参数：
+            img_vis: 可见光图像，形状为(1, 3, H, W)。
+            img_ir: 红外图像，形状为(1, 3, H, W)。
+            class_idx: 是否使用类别索引，默认为True。
+
+        返回：
+            saliency_maps: 与输入图像相同空间维度的显著性图列表。
+            logits: 模型输出。
+            preds: 目标预测结果。
         """
         saliency_maps = []
         b, c, h, w = img_vis.size()
@@ -81,4 +102,16 @@ class YOLOV5GradCAM:
         return saliency_maps, logits, preds
 
     def __call__(self, img_vis, img_ir):
+        """
+        调用YOLOV5GradCAM类的前向传播函数
+
+        参数：
+            img_vis: 可见光图像，形状为(1, 3, H, W)。
+            img_ir: 红外图像，形状为(1, 3, H, W)。
+
+        返回：
+            saliency_maps: 与输入图像相同空间维度的显著性图列表。
+            logits: 模型输出。
+            preds: 目标预测结果。
+        """
         return self.forward(img_vis, img_ir)

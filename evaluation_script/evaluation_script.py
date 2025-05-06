@@ -1,9 +1,8 @@
-"""Evaluate performance on multispectral pedestrian detection benchmark
+"""
+评估多光谱行人检测基准上的性能
 
-This script evalutes multispectral detection performance.
-We adopt [cocoapi](https://github.com/cocodataset/cocoapi)
-and apply minor modification for KAISTPed benchmark.
-
+此脚本评估多光谱检测性能。
+我们采用了 [cocoapi](https://github.com/cocodataset/cocoapi) 并对其进行了少量修改以适应 KAISTPed 基准。
 """
 from collections import defaultdict
 import argparse
@@ -30,24 +29,28 @@ matplotlib.rc('font', **font)
 
 
 class KAISTPedEval(COCOeval):
-
+    """
+    KAISTPed 评估类，继承自 COCOeval。
+    """
     def __init__(self, kaistGt=None, kaistDt=None, iouType='segm', method='unknown'):
-        '''
-        Initialize CocoEval using coco APIs for gt and dt
-        :param cocoGt: coco object with ground truth annotations
-        :param cocoDt: coco object with detection results
-        :return: None
-        '''
+        """
+        使用 KAISTPed API 初始化 KAISTPedEval 对象。
+        :param kaistGt: 包含真实标注的 KAISTPed API 对象。
+        :param kaistDt: 包含检测结果的 KAISTPed API 对象。
+        :param iouType: 评估类型，可以是 'segm'（分割）或 'bbox'（边界框）。
+        :param method: 检测方法名称。
+        """
         super().__init__(kaistGt, kaistDt, iouType)
 
-        self.params = KAISTParams(iouType=iouType)   # parameters
+        self.params = KAISTParams(iouType=iouType)   # 参数
         self.method = method
 
     def _prepare(self, id_setup):
-        '''
-        Prepare ._gts and ._dts for evaluation based on params
+        """
+        根据参数准备用于评估的真实标注和检测结果。
+        :param id_setup: 设置 ID。
         :return: None
-        '''
+        """
         p = self.params
         if p.useCats:
             gts = self.cocoGt.loadAnns(self.cocoGt.getAnnIds(imgIds=p.imgIds, catIds=p.catIds))
@@ -56,7 +59,7 @@ class KAISTPedEval(COCOeval):
             gts = self.cocoGt.loadAnns(self.cocoGt.getAnnIds(imgIds=p.imgIds))
             dts = self.cocoDt.loadAnns(self.cocoDt.getAnnIds(imgIds=p.imgIds))
 
-        # set ignore flag
+        # 设置忽略标志
         for gt in gts:
             gt['ignore'] = gt['ignore'] if 'ignore' in gt else 0
             gbox = gt['bbox']
@@ -70,23 +73,24 @@ class KAISTPedEval(COCOeval):
                 or gbox[1] + gbox[3] > self.params.bndRng[3] \
                 else gt['ignore']
 
-        self._gts = defaultdict(list)       # gt for evaluation
-        self._dts = defaultdict(list)       # dt for evaluation
+        self._gts = defaultdict(list)       # 用于评估的真实标注
+        self._dts = defaultdict(list)       # 用于评估的检测结果
         for gt in gts:
             self._gts[gt['image_id'], gt['category_id']].append(gt)
         for dt in dts:
             self._dts[dt['image_id'], dt['category_id']].append(dt)
 
-        self.evalImgs = defaultdict(list)   # per-image per-category evaluation results
-        self.eval = {}                      # accumulated evaluation results
+        self.evalImgs = defaultdict(list)   # 每张图片每个类别的评估结果
+        self.eval = {}                      # 累积的评估结果
 
     def evaluate(self, id_setup):
-        '''
-        Run per image evaluation on given images and store results (a list of dict) in self.evalImgs
+        """
+        对给定的图片运行单张图片评估，并将结果存储在 self.evalImgs 中。
+        :param id_setup: 设置 ID。
         :return: None
-        '''
+        """
         p = self.params
-        # add backward compatibility if useSegm is specified in params
+        # 添加向后兼容性，如果在参数中指定了 useSegm
         if p.useSegm is not None:
             p.iouType = 'segm' if p.useSegm == 1 else 'bbox'
             #print('useSegm (deprecated) is not None. Running {} evaluation'.format(p.iouType))
@@ -98,7 +102,7 @@ class KAISTPedEval(COCOeval):
         self.params = p
 
         self._prepare(id_setup)
-        # loop through images, area range, max detection number
+        # 遍历图片、面积范围、最大检测数量
         catIds = p.catIds if p.useCats else [-1]
 
         computeIoU = self.computeIoU
@@ -117,6 +121,12 @@ class KAISTPedEval(COCOeval):
         self._paramsEval = copy.deepcopy(self.params)
 
     def computeIoU(self, imgId, catId):
+        """
+        计算给定图片和类别的真实标注和检测结果之间的 IoU。
+        :param imgId: 图片 ID
+        :param catId: 类别 ID
+        :return: IoU 矩阵
+        """
         p = self.params
         if p.useCats:
             gt = self._gts[imgId, catId]
@@ -140,12 +150,19 @@ class KAISTPedEval(COCOeval):
         else:
             raise Exception('unknown iouType for iou computation')
 
-        # compute iou between each dt and gt region
+        # 计算每个检测结果和真实标注之间的 IoU
         iscrowd = [int(o['ignore']) for o in gt]
         ious = self.iou(d, g, iscrowd)
         return ious
 
     def iou(self, dts, gts, pyiscrowd):
+        """
+        计算检测结果和真实标注之间的 IoU。
+        :param dts: 检测结果的边界框。
+        :param gts: 真实标注的边界框。
+        :param pyiscrowd: 是否为拥挤标注。
+        :return: IoU 矩阵
+        """
         dts = np.asarray(dts)
         gts = np.asarray(gts)
         pyiscrowd = np.asarray(pyiscrowd)
@@ -179,10 +196,15 @@ class KAISTPedEval(COCOeval):
         return ious
 
     def evaluateImg(self, imgId, catId, hRng, oRng, maxDet):
-        '''
-        perform evaluation for single category and image
-        :return: dict (single image results)
-        '''
+        """
+        对单张图片和类别进行评估。
+        :param imgId: 图片 ID
+        :param catId: 类别 ID
+        :param hRng: 高度范围
+        :param oRng: 遮挡范围
+        :param maxDet: 最大检测数量
+        :return: 评估结果字典
+        """
         try:
             p = self.params
             if p.useCats:
@@ -201,7 +223,7 @@ class KAISTPedEval(COCOeval):
                 else:
                     g['_ignore'] = 0
 
-            # sort dt highest score first, sort gt ignore last
+            # 按分数排序检测结果，按忽略标志排序真实标注
             gtind = np.argsort([g['_ignore'] for g in gt], kind='mergesort')
             gt = [gt[i] for i in gtind]
             dtind = np.argsort([-d['score'] for d in dt], kind='mergesort')
@@ -210,7 +232,7 @@ class KAISTPedEval(COCOeval):
             if len(dt) == 0:
                 return None
 
-            # load computed ious        
+            # 加载计算好的 IoU
             ious = self.ious[imgId, catId][dtind, :] if len(self.ious[imgId, catId]) > 0 else self.ious[imgId, catId]
             ious = ious[:, gtind]
 
@@ -225,23 +247,23 @@ class KAISTPedEval(COCOeval):
             if not len(ious) == 0:
                 for tind, t in enumerate(p.iouThrs):
                     for dind, d in enumerate(dt):
-                        # information about best match so far (m=-1 -> unmatched)
+                        # 记录最佳匹配（m=-1 表示未匹配）
                         iou = min([t, 1 - 1e-10])
                         bstOa = iou
                         bstg = -2
                         bstm = -2
                         for gind, g in enumerate(gt):
                             m = gtm[tind, gind]
-                            # if this gt already matched, and not a crowd, continue
+                            # 如果真实标注已匹配且不是拥挤标注，跳过
                             if m > 0:
                                 continue
-                            # if dt matched to reg gt, and on ignore gt, stop
+                            # 如果检测结果匹配到常规真实标注，且当前真实标注为忽略标注，停止
                             if bstm != -2 and gtIg[gind] == 1:
                                 break
-                            # continue to next gt unless better match made
+                            # 如果 IoU 小于最佳匹配 IoU，跳过
                             if ious[dind, gind] < bstOa:
                                 continue
-                            # if match successful and best so far, store appropriately
+                            # 如果匹配成功且是最佳匹配，记录匹配信息
                             bstOa = ious[dind, gind]
                             bstg = gind
                             if gtIg[gind] == 0:
@@ -249,7 +271,7 @@ class KAISTPedEval(COCOeval):
                             else:
                                 bstm = -1
 
-                        # if match made store id of match for both dt and gt
+                        # 如果匹配成功，记录匹配信息
                         if bstg == -2:
                             continue
                         dtIg[tind, dind] = gtIg[bstg]
@@ -261,10 +283,10 @@ class KAISTPedEval(COCOeval):
 
             ex_type, ex_value, ex_traceback = sys.exc_info()            
 
-            # Extract unformatter stack traces as tuples
+            # 提取未格式化的堆栈跟踪作为元组
             trace_back = traceback.extract_tb(ex_traceback)
 
-            # Format stacktrace
+            # 格式化堆栈跟踪
             stack_trace = list()
 
             for trace in trace_back:
@@ -277,7 +299,7 @@ class KAISTPedEval(COCOeval):
 
             pdb.set_trace()
 
-        # store results for given image and category
+        # 存储当前图片和类别的评估结果
         return {
             'image_id': imgId,
             'category_id': catId,
@@ -294,15 +316,15 @@ class KAISTPedEval(COCOeval):
         }
 
     def accumulate(self, p=None):
-        '''
-        Accumulate per image evaluation results and store the result in self.eval
-        :param p: input params for evaluation
+        """
+        累积每张图片的评估结果，并存储在 self.eval 中。
+        :param p: 评估参数
         :return: None
-        '''
+        """
         if not self.evalImgs:
             pass
             #print('Please run evaluate() first')
-        # allows input customized parameters
+        # 允许输入自定义参数
         if p is None:
             p = self.params
         p.catIds = p.catIds if p.useCats == 1 else [-1]
@@ -310,24 +332,24 @@ class KAISTPedEval(COCOeval):
         R = len(p.fppiThrs)
         K = len(p.catIds) if p.useCats else 1
         M = len(p.maxDets)
-        ys = -np.ones((T, R, K, M))     # -1 for the precision of absent categories
+        ys = -np.ones((T, R, K, M))     # -1 表示缺失类别的精度
 
         xx_graph = []
         yy_graph = []
 
-        # create dictionary for future indexing
+        # 创建索引字典
         _pe = self._paramsEval
         catIds = [1]                    # _pe.catIds if _pe.useCats else [-1]
         setK = set(catIds)
         setM = set(_pe.maxDets)
         setI = set(_pe.imgIds)
-        # get inds to evaluate
+        # 获取需要评估的索引
         k_list = [n for n, k in enumerate(p.catIds) if k in setK]
         m_list = [m for n, m in enumerate(p.maxDets) if m in setM]
         i_list = [n for n, i in enumerate(p.imgIds) if i in setI]
         I0 = len(_pe.imgIds)
         
-        # retrieve E at each category, area range, and max number of detections
+        # 按类别、面积范围和最大检测数量获取评估结果
         for k, k0 in enumerate(k_list):
             Nk = k0 * I0
             for m, maxDet in enumerate(m_list):
@@ -338,8 +360,8 @@ class KAISTPedEval(COCOeval):
 
                 dtScores = np.concatenate([e['dtScores'][0:maxDet] for e in E])
 
-                # different sorting method generates slightly different results.
-                # mergesort is used to be consistent as Matlab implementation.
+                # 不同的排序方法会产生略有不同的结果。
+                # 使用 mergesort 以保持与 Matlab 实现的一致性。
 
                 inds = np.argsort(-dtScores, kind='mergesort')
 
@@ -368,8 +390,8 @@ class KAISTPedEval(COCOeval):
                     xx_graph.append(fppi)
                     yy_graph.append(1 - recall)
 
-                    # numpy is slow without cython optimization for accessing elements
-                    # use python array gets significant speed improvement
+                    # numpy 在没有 cython 优化时访问元素会很慢。
+                    # 使用 Python 列表可以获得显著的速度提升
                     recall = recall.tolist()
                     q = q.tolist()
 
@@ -396,7 +418,13 @@ class KAISTPedEval(COCOeval):
 
     @staticmethod
     def draw_figure(ax, eval_results, methods, colors):
-        """Draw figure"""
+        """
+        绘制图形。
+        :param ax: Matplotlib 轴对象。
+        :param eval_results: 评估结果列表。
+        :param methods: 方法名称列表。
+        :param colors: 颜色列表。
+        """
         assert len(eval_results) == len(methods) == len(colors)
 
         for eval_result, method, color in zip(eval_results, methods, colors):
@@ -430,10 +458,12 @@ class KAISTPedEval(COCOeval):
         ax.set_xlabel('false positives per image')
 
     def summarize(self, id_setup, res_file=None):
-        '''
-        Compute and display summary metrics for evaluation results.
-        Note this functin can *only* be applied on the default parameter setting
-        '''
+        """
+        计算并显示评估结果的摘要指标。
+        :param id_setup: 设置 ID。
+        :param res_file: 结果文件路径。
+        :return: 平均误检率。
+        """
         def _summarize(iouThr=None, maxDets=100):
             OCC_TO_TEXT = ['none', 'partial_occ', 'heavy_occ']
 
@@ -476,16 +506,17 @@ class KAISTPedEval(COCOeval):
 
 
 class KAISTParams(Params):
-    """Params for KAISTPed evaluation api"""
-
+    """
+    KAISTPed 评估参数类。
+    """
     def setDetParams(self):
         super().setDetParams()
 
-        # Override variables for KAISTPed benchmark
+        # 覆盖 KAISTPed 基准的变量
         self.iouThrs = np.array([0.5])
         self.maxDets = [1000]
 
-        # KAISTPed specific settings
+        # KAISTPed 特定设置
         self.fppiThrs = np.array([0.0100, 0.0178, 0.0316, 0.0562, 0.1000, 0.1778, 0.3162, 0.5623, 1.0000])
         #self.HtRng = [[55, 1e5 ** 2], [50, 75], [50, 1e5 ** 2], [20, 1e5 ** 2]]
         self.HtRng = [[55, 1e5 ** 2], [115, 1e5 ** 2], [45, 115], [1, 45], [1, 1e5 ** 2], [1, 1e5 ** 2], [1, 1e5 ** 2]] # jifengshen
@@ -494,16 +525,18 @@ class KAISTParams(Params):
         #self.SetupLbl = ['Reasonable', 'Reasonable_small', 'Reasonable_occ=heavy', 'All']
         self.SetupLbl = ['Reasonable', 'scale=near', 'scale=medium', 'scale=far', 'occ=none', 'occ=partial', 'occ=heavy', 'All']
         
-        self.bndRng = [5, 5, 635, 507]  # discard bbs outside this pixel range
+        self.bndRng = [5, 5, 635, 507]  # 抛弃超出此像素范围的边界框
 
 
 class KAIST(COCO):
-
+    """
+    KAIST 数据集类，继承自 COCO。
+    """
     def txt2json(self, txt):
         """
-        Convert txt file to coco json format
-        Arguments:
-            `txt`: Path to annotation file that txt
+        将 txt 文件转换为 COCO JSON 格式。
+        :param txt: 注释文件路径。
+        :return: JSON 格式的注释。
         """
         predict_result = []
         f = open(txt, 'r')
@@ -512,9 +545,9 @@ class KAIST(COCO):
         for line in lines:
             json_format = {}
             pred_info = [float(ll) for ll in line.split(',')]
-            json_format["image_id"] = pred_info[0] - 1                                      # image id
-            json_format["category_id"] = 1                                                  # pedestrian
-            json_format["bbox"] = [pred_info[1], pred_info[2], pred_info[3], pred_info[4]]  # bbox
+            json_format["image_id"] = pred_info[0] - 1                                      # 图片 ID
+            json_format["category_id"] = 1                                                  # 行人类别
+            json_format["bbox"] = [pred_info[1], pred_info[2], pred_info[3], pred_info[4]]  # 边界框
             json_format["score"] = pred_info[5]
 
             predict_result.append(json_format)
@@ -522,12 +555,11 @@ class KAIST(COCO):
 
     def loadRes(self, resFile):
         """
-        Load result file and return a result api object.
-        :param   resFile (str)     : file name of result file
-        :return: res (obj)         : result api object
+        加载结果文件并返回结果 API 对象。
+        :param resFile: 结果文件路径。
+        :return: 结果 API 对象。
         """
-
-        # If resFile is a text file, convert it to json
+        # 如果结果文件是 txt 文件，转换为 JSON
         if type(resFile) == str and resFile.endswith('.txt'):
             anns = self.txt2json(resFile)
             _resFile = next(tempfile._get_candidate_names())
@@ -544,21 +576,14 @@ class KAIST(COCO):
 
 
 def evaluate(test_annotation_file: str, user_submission_file: str, phase_codename: str = 'Multispectral', plot=False):
-    """Evaluates the submission for a particular challenge phase and returns score
+    """
+    评估特定挑战阶段的提交并返回分数。
 
-    Parameters
-    ----------
-    test_annotations_file: str
-        Path to test_annotation_file on the server
-    user_submission_file: str
-        Path to file submitted by the user
-    phase_codename: str
-        Phase to which submission is made
-
-    Returns
-    -------
-    Dict
-        Evaluated/Accumulated KAISTPedEval objects for All/Day/Night
+    :param test_annotation_file: 测试注释文件路径。
+    :param user_submission_file: 用户提交文件路径。
+    :param phase_codename: 提交所在的阶段。
+    :param plot: 是否绘制图形。
+    :return: 所有/白天/夜晚的 KAISTPedEval 对象。
     """
     kaistGt = KAIST(test_annotation_file)
     kaistDt = kaistGt.loadRes(user_submission_file)
@@ -647,15 +672,11 @@ def evaluate(test_annotation_file: str, user_submission_file: str, phase_codenam
 
 
 def draw_all(eval_results, filename='figure.jpg'):
-    """Draw all results in a single figure as Miss rate versus false positive per-image (FPPI) curve
+    """
+    在单个图形中绘制所有结果，作为误检率与每张图片的假阳性数量（FPPI）曲线。
 
-    Parameters
-    ----------
-    eval_results: List of Dict
-        Aggregated evaluation results from evaluate function.
-        Dictionary contains KAISTPedEval objects for All/Day/Night
-    filename: str
-        Filename of figure
+    :param eval_results: 评估结果列表。
+    :param filename: 图形文件名。
     """
     fig, axes = plt.subplots(1, 3, figsize=(45, 10))
 
@@ -692,6 +713,6 @@ if __name__ == "__main__":
     phase = "Multispectral"
     results = [evaluate(args.annFile, args.rstFiles, phase)]
 
-    # Sort results by MR_all
+    # 按照 MR_all 排序结果
     results = sorted(results, key=lambda x: x['all'].summarize(0), reverse=True)
     draw_all(results, filename=args.evalFig)

@@ -459,7 +459,7 @@ createApp({
                 console.log('检测响应:', data)
                 
                 if (response.ok) {
-                    // 确保使用完整的URL
+                    // 使用完整的URL
                     const resultUrl = `${this.apiBaseUrl}/${data.result_image}`
                     console.log('结果图片URL:', resultUrl)
                     this.resultImage = resultUrl
@@ -706,7 +706,6 @@ createApp({
             }
         },
         handleUserFilter() {
-            // 不再需要重新加载数据，因为使用计算属性实时筛选
             console.log('筛选条件更新:', {
                 selectedUserId: this.selectedUserId,
                 searchQuery: this.userSearchQuery

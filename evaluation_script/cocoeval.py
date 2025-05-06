@@ -8,86 +8,39 @@ from collections import defaultdict
 import copy
 
 class COCOeval:
-    # Interface for evaluating detection on the Microsoft COCO dataset.
-    #
-    # The usage for CocoEval is as follows:
-    #  cocoGt=..., cocoDt=...       # load dataset and results
-    #  E = CocoEval(cocoGt,cocoDt); # initialize CocoEval object
-    #  E.params.recThrs = ...;      # set parameters as desired
-    #  E.evaluate();                # run per image evaluation
-    #  E.accumulate();              # accumulate per image results
-    #  E.summarize();               # display summary metrics of results
-    # For example usage see evalDemo.m and http://mscoco.org/.
-    #
-    # The evaluation parameters are as follows (defaults in brackets):
-    #  imgIds     - [all] N img ids to use for evaluation
-    #  catIds     - [all] K cat ids to use for evaluation
-    #  iouThrs    - [.5:.05:.95] T=10 IoU thresholds for evaluation
-    #  recThrs    - [0:.01:1] R=101 recall thresholds for evaluation
-    #  areaRng    - [...] A=4 object area ranges for evaluation
-    #  maxDets    - [1 10 100] M=3 thresholds on max detections per image
-    #  iouType    - ['segm'] set iouType to 'segm', 'bbox' or 'keypoints'
-    #  iouType replaced the now DEPRECATED useSegm parameter.
-    #  useCats    - [1] if true use category labels for evaluation
-    # Note: if useCats=0 category labels are ignored as in proposal scoring.
-    # Note: multiple areaRngs [Ax2] and maxDets [Mx1] can be specified.
-    #
-    # evaluate(): evaluates detections on every image and every category and
-    # concats the results into the "evalImgs" with fields:
-    #  dtIds      - [1xD] id for each of the D detections (dt)
-    #  gtIds      - [1xG] id for each of the G ground truths (gt)
-    #  dtMatches  - [TxD] matching gt id at each IoU or 0
-    #  gtMatches  - [TxG] matching dt id at each IoU or 0
-    #  dtScores   - [1xD] confidence of each dt
-    #  gtIgnore   - [1xG] ignore flag for each gt
-    #  dtIgnore   - [TxD] ignore flag for each dt at each IoU
-    #
-    # accumulate(): accumulates the per-image, per-category evaluation
-    # results in "evalImgs" into the dictionary "eval" with fields:
-    #  params     - parameters used for evaluation
-    #  date       - date evaluation was performed
-    #  counts     - [T,R,K,A,M] parameter dimensions (see above)
-    #  precision  - [TxRxKxAxM] precision for every evaluation setting
-    #  recall     - [TxKxAxM] max recall for every evaluation setting
-    # Note: precision and recall==-1 for settings with no gt objects.
-    #
-    # See also coco, mask, pycocoDemo, pycocoEvalDemo
-    #
-    # Microsoft COCO Toolbox.      version 2.0
-    # Data, paper, and tutorials available at:  http://mscoco.org/
-    # Code written by Piotr Dollar and Tsung-Yi Lin, 2015.
-    # Licensed under the Simplified BSD License [see coco/license.txt]
+    """
+    用于评估在 Microsoft COCO 数据集上的目标检测性能的接口。
+    """
     def __init__(self, cocoGt=None, cocoDt=None, iouType='segm'):
-        '''
-        Initialize CocoEval using coco APIs for gt and dt
-        :param cocoGt: coco object with ground truth annotations
-        :param cocoDt: coco object with detection results
-        :return: None
-        '''
+        """
+        使用 COCO API 初始化 COCOeval 对象。
+        :param cocoGt: 包含真实标注的 COCO API 对象。
+        :param cocoDt: 包含检测结果的 COCO API 对象。
+        :param iouType: 评估类型，可以是 'segm'（分割）、'bbox'（边界框）或 'keypoints'（关键点）。
+        """
         if not iouType:
             print('iouType not specified. use default iouType segm')
-        self.cocoGt   = cocoGt              # ground truth COCO API
-        self.cocoDt   = cocoDt              # detections COCO API
-        self.evalImgs = defaultdict(list)   # per-image per-category evaluation results [KxAxI] elements
-        self.eval     = {}                  # accumulated evaluation results
-        self._gts = defaultdict(list)       # gt for evaluation
-        self._dts = defaultdict(list)       # dt for evaluation
-        self.params = Params(iouType=iouType) # parameters
-        self._paramsEval = {}               # parameters for evaluation
-        self.stats = []                     # result summarization
-        self.ious = {}                      # ious between all gts and dts
+        self.cocoGt   = cocoGt              # 真实标注的 COCO API
+        self.cocoDt   = cocoDt              # 检测结果的 COCO API
+        self.evalImgs = defaultdict(list)   # 每张图片每个类别的评估结果
+        self.eval     = {}                  # 累积的评估结果
+        self._gts = defaultdict(list)       # 用于评估的真实标注
+        self._dts = defaultdict(list)       # 用于评估的检测结果
+        self.params = Params(iouType=iouType) # 评估参数
+        self._paramsEval = {}               # 评估时使用的参数
+        self.stats = []                     # 结果摘要
+        self.ious = {}                      # 所有真实标注和检测结果之间的 IoU
         if not cocoGt is None:
             self.params.imgIds = sorted(cocoGt.getImgIds())
             self.params.catIds = sorted(cocoGt.getCatIds())
 
 
     def _prepare(self):
-        '''
-        Prepare ._gts and ._dts for evaluation based on params
-        :return: None
-        '''
+        """
+        根据参数准备用于评估的真实标注和检测结果。
+        """
         def _toMask(anns, coco):
-            # modify ann['segmentation'] by reference
+            # 修改 ann['segmentation'] 为 RLE 格式
             for ann in anns:
                 rle = coco.annToRLE(ann)
                 ann['segmentation'] = rle
@@ -99,34 +52,33 @@ class COCOeval:
             gts=self.cocoGt.loadAnns(self.cocoGt.getAnnIds(imgIds=p.imgIds))
             dts=self.cocoDt.loadAnns(self.cocoDt.getAnnIds(imgIds=p.imgIds))
 
-        # convert ground truth to mask if iouType == 'segm'
+        # 如果是分割任务，将真实标注和检测结果转换为掩码格式
         if p.iouType == 'segm':
             _toMask(gts, self.cocoGt)
             _toMask(dts, self.cocoDt)
-        # set ignore flag
+        # 设置忽略标志
         for gt in gts:
             gt['ignore'] = gt['ignore'] if 'ignore' in gt else 0
             gt['ignore'] = 'iscrowd' in gt and gt['iscrowd']
             if p.iouType == 'keypoints':
                 gt['ignore'] = (gt['num_keypoints'] == 0) or gt['ignore']
-        self._gts = defaultdict(list)       # gt for evaluation
-        self._dts = defaultdict(list)       # dt for evaluation
+        self._gts = defaultdict(list)       # 用于评估的真实标注
+        self._dts = defaultdict(list)       # 用于评估的检测结果
         for gt in gts:
             self._gts[gt['image_id'], gt['category_id']].append(gt)
         for dt in dts:
             self._dts[dt['image_id'], dt['category_id']].append(dt)
-        self.evalImgs = defaultdict(list)   # per-image per-category evaluation results
-        self.eval     = {}                  # accumulated evaluation results
+        self.evalImgs = defaultdict(list)   # 每张图片每个类别的评估结果
+        self.eval     = {}                  # 累积的评估结果
 
     def evaluate(self):
-        '''
-        Run per image evaluation on given images and store results (a list of dict) in self.evalImgs
-        :return: None
-        '''
+        """
+        对给定的图片运行单张图片评估，并将结果存储在 self.evalImgs 中。
+        """
         tic = time.time()
         print('Running per image evaluation...')
         p = self.params
-        # add backward compatibility if useSegm is specified in params
+        # 如果指定了 useSegm 参数，设置 iouType
         if not p.useSegm is None:
             p.iouType = 'segm' if p.useSegm == 1 else 'bbox'
             print('useSegm (deprecated) is not None. Running {} evaluation'.format(p.iouType))
@@ -138,7 +90,7 @@ class COCOeval:
         self.params=p
 
         self._prepare()
-        # loop through images, area range, max detection number
+        # 遍历图片、面积范围和最大检测数量
         catIds = p.catIds if p.useCats else [-1]
 
         if p.iouType == 'segm' or p.iouType == 'bbox':
@@ -161,6 +113,12 @@ class COCOeval:
         print('DONE (t={:0.2f}s).'.format(toc-tic))
 
     def computeIoU(self, imgId, catId):
+        """
+        计算给定图片和类别的真实标注和检测结果之间的 IoU。
+        :param imgId: 图片 ID
+        :param catId: 类别 ID
+        :return: IoU 矩阵
+        """
         p = self.params
         if p.useCats:
             gt = self._gts[imgId,catId]
@@ -184,12 +142,18 @@ class COCOeval:
         else:
             raise Exception('unknown iouType for iou computation')
 
-        # compute iou between each dt and gt region
+        # 计算每个检测结果和真实标注之间的 IoU
         iscrowd = [int(o['iscrowd']) for o in gt]
         ious = maskUtils.iou(d,g,iscrowd)
         return ious
 
     def computeOks(self, imgId, catId):
+        """
+        计算给定图片和类别的真实标注和检测结果之间的 OKS。
+        :param imgId: 图片 ID
+        :param catId: 类别 ID
+        :return: OKS 矩阵
+        """
         p = self.params
         # dimention here should be Nxm
         gts = self._gts[imgId, catId]
@@ -205,7 +169,7 @@ class COCOeval:
         sigmas = p.kpt_oks_sigmas
         vars = (sigmas * 2)**2
         k = len(sigmas)
-        # compute oks between each detection and ground truth object
+        # 计算每个检测结果和真实标注之间的 OKS
         for j, gt in enumerate(gts):
             # create bounds for ignore regions(double the gt bbox)
             g = np.array(gt['keypoints'])
@@ -233,10 +197,14 @@ class COCOeval:
         return ious
 
     def evaluateImg(self, imgId, catId, aRng, maxDet):
-        '''
-        perform evaluation for single category and image
-        :return: dict (single image results)
-        '''
+        """
+        对单张图片和类别进行评估。
+        :param imgId: 图片 ID
+        :param catId: 类别 ID
+        :param aRng: 面积范围
+        :param maxDet: 最大检测数量
+        :return: 评估结果字典
+        """
         p = self.params
         if p.useCats:
             gt = self._gts[imgId,catId]
@@ -253,13 +221,13 @@ class COCOeval:
             else:
                 g['_ignore'] = 0
 
-        # sort dt highest score first, sort gt ignore last
+        # 按分数排序检测结果，按 ignore 排序真实标注
         gtind = np.argsort([g['_ignore'] for g in gt], kind='mergesort')
         gt = [gt[i] for i in gtind]
         dtind = np.argsort([-d['score'] for d in dt], kind='mergesort')
         dt = [dt[i] for i in dtind[0:maxDet]]
         iscrowd = [int(o['iscrowd']) for o in gt]
-        # load computed ious
+        # 加载计算好的 IoU
         ious = self.ious[imgId, catId][:, gtind] if len(self.ious[imgId, catId]) > 0 else self.ious[imgId, catId]
 
         T = len(p.iouThrs)
@@ -272,32 +240,32 @@ class COCOeval:
         if not len(ious)==0:
             for tind, t in enumerate(p.iouThrs):
                 for dind, d in enumerate(dt):
-                    # information about best match so far (m=-1 -> unmatched)
+                    # 记录最佳匹配（m=-1 表示未匹配）
                     iou = min([t,1-1e-10])
                     m   = -1
                     for gind, g in enumerate(gt):
-                        # if this gt already matched, and not a crowd, continue
+                        # 如果真实标注已匹配且不是 crowd，跳过
                         if gtm[tind,gind]>0 and not iscrowd[gind]:
                             continue
-                        # if dt matched to reg gt, and on ignore gt, stop
+                        # 如果检测结果匹配到常规真实标注，且当前真实标注为 ignore，停止
                         if m>-1 and gtIg[m]==0 and gtIg[gind]==1:
                             break
-                        # continue to next gt unless better match made
+                        # 如果 IoU 小于阈值，跳过
                         if ious[dind,gind] < iou:
                             continue
-                        # if match successful and best so far, store appropriately
+                        # 如果匹配成功且是最佳匹配，记录匹配信息
                         iou=ious[dind,gind]
                         m=gind
-                    # if match made store id of match for both dt and gt
+                    # 如果未匹配，继续
                     if m ==-1:
                         continue
                     dtIg[tind,dind] = gtIg[m]
                     dtm[tind,dind]  = gt[m]['id']
                     gtm[tind,m]     = d['id']
-        # set unmatched detections outside of area range to ignore
+        # 将超出面积范围的未匹配检测结果标记为 ignore
         a = np.array([d['area']<aRng[0] or d['area']>aRng[1] for d in dt]).reshape((1, len(dt)))
         dtIg = np.logical_or(dtIg, np.logical_and(dtm==0, np.repeat(a,T,0)))
-        # store results for given image and category
+        # 存储当前图片和类别的评估结果
         return {
                 'image_id':     imgId,
                 'category_id':  catId,
@@ -313,16 +281,16 @@ class COCOeval:
             }
 
     def accumulate(self, p = None):
-        '''
-        Accumulate per image evaluation results and store the result in self.eval
-        :param p: input params for evaluation
+        """
+        累积每张图片的评估结果，并存储在 self.eval 中。
+        :param p: 评估参数
         :return: None
-        '''
+        """
         print('Accumulating evaluation results...')
         tic = time.time()
         if not self.evalImgs:
             print('Please run evaluate() first')
-        # allows input customized parameters
+        # 允许输入自定义参数
         if p is None:
             p = self.params
         p.catIds = p.catIds if p.useCats == 1 else [-1]
@@ -331,25 +299,25 @@ class COCOeval:
         K           = len(p.catIds) if p.useCats else 1
         A           = len(p.areaRng)
         M           = len(p.maxDets)
-        precision   = -np.ones((T,R,K,A,M)) # -1 for the precision of absent categories
+        precision   = -np.ones((T,R,K,A,M)) # -1 表示缺失类别的精度
         recall      = -np.ones((T,K,A,M))
         scores      = -np.ones((T,R,K,A,M))
 
-        # create dictionary for future indexing
+        # 创建索引字典
         _pe = self._paramsEval
         catIds = _pe.catIds if _pe.useCats else [-1]
         setK = set(catIds)
         setA = set(map(tuple, _pe.areaRng))
         setM = set(_pe.maxDets)
         setI = set(_pe.imgIds)
-        # get inds to evaluate
+        # 获取需要评估的索引
         k_list = [n for n, k in enumerate(p.catIds)  if k in setK]
         m_list = [m for n, m in enumerate(p.maxDets) if m in setM]
         a_list = [n for n, a in enumerate(map(lambda x: tuple(x), p.areaRng)) if a in setA]
         i_list = [n for n, i in enumerate(p.imgIds)  if i in setI]
         I0 = len(_pe.imgIds)
         A0 = len(_pe.areaRng)
-        # retrieve E at each category, area range, and max number of detections
+        # 按类别、面积范围和最大检测数量获取评估结果
         for k, k0 in enumerate(k_list):
             Nk = k0*A0*I0
             for a, a0 in enumerate(a_list):
@@ -361,8 +329,8 @@ class COCOeval:
                         continue
                     dtScores = np.concatenate([e['dtScores'][0:maxDet] for e in E])
 
-                    # different sorting method generates slightly different results.
-                    # mergesort is used to be consistent as Matlab implementation.
+                    # 不同的排序方法会产生略有不同的结果。
+                    # 使用 mergesort 以保持与 Matlab 实现的一致性。
                     inds = np.argsort(-dtScores, kind='mergesort')
                     dtScoresSorted = dtScores[inds]
 
@@ -420,11 +388,19 @@ class COCOeval:
         print('DONE (t={:0.2f}s).'.format( toc-tic))
 
     def summarize(self):
-        '''
-        Compute and display summary metrics for evaluation results.
-        Note this functin can *only* be applied on the default parameter setting
-        '''
+        """
+        计算并显示评估结果的摘要指标。
+        注意，该函数只能在默认参数设置下使用。
+        """
         def _summarize( ap=1, iouThr=None, areaRng='all', maxDets=100 ):
+            """
+            摘要统计函数。
+            :param ap: 是否计算平均精度（AP）或平均召回率（AR）。
+            :param iouThr: IoU 阈值。
+            :param areaRng: 面积范围。
+            :param maxDets: 最大检测数量。
+            :return: 摘要指标值。
+            """
             p = self.params
             iStr = ' {:<18} {} @[ IoU={:<9} | area={:>6s} | maxDets={:>3d} ] = {:0.3f}'
             titleStr = 'Average Precision' if ap == 1 else 'Average Recall'
@@ -435,7 +411,7 @@ class COCOeval:
             aind = [i for i, aRng in enumerate(p.areaRngLbl) if aRng == areaRng]
             mind = [i for i, mDet in enumerate(p.maxDets) if mDet == maxDets]
             if ap == 1:
-                # dimension of precision: [TxRxKxAxM]
+                # 精度的维度：[TxRxKxAxM]
                 s = self.eval['precision']
                 # IoU
                 if iouThr is not None:
@@ -443,7 +419,7 @@ class COCOeval:
                     s = s[t]
                 s = s[:,:,:,aind,mind]
             else:
-                # dimension of recall: [TxKxAxM]
+                # 召回率的维度：[TxKxAxM]
                 s = self.eval['recall']
                 if iouThr is not None:
                     t = np.where(iouThr == p.iouThrs)[0]
@@ -456,6 +432,10 @@ class COCOeval:
             print(iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s))
             return mean_s
         def _summarizeDets():
+            """
+            摘要统计目标检测任务的指标。
+            :return: 摘要指标数组。
+            """
             stats = np.zeros((12,))
             stats[0] = _summarize(1)
             stats[1] = _summarize(1, iouThr=.5, maxDets=self.params.maxDets[2])
@@ -471,6 +451,10 @@ class COCOeval:
             stats[11] = _summarize(0, areaRng='large', maxDets=self.params.maxDets[2])
             return stats
         def _summarizeKps():
+            """
+            摘要统计关键点检测任务的指标。
+            :return: 摘要指标数组。
+            """
             stats = np.zeros((10,))
             stats[0] = _summarize(1, maxDets=20)
             stats[1] = _summarize(1, maxDets=20, iouThr=.5)
@@ -496,13 +480,16 @@ class COCOeval:
         self.summarize()
 
 class Params:
-    '''
-    Params for coco evaluation api
-    '''
+    """
+    COCO 评估 API 的参数类。
+    """
     def setDetParams(self):
+        """
+        设置目标检测任务的默认参数。
+        """
         self.imgIds = []
         self.catIds = []
-        # np.arange causes trouble.  the data point on arange is slightly larger than the true value
+        # np.arange 会导致问题。np.arange 的数据点略大于真实值。
         self.iouThrs = np.linspace(.5, 0.95, int(np.round((0.95 - .5) / .05)) + 1, endpoint=True)
         self.recThrs = np.linspace(.0, 1.00, int(np.round((1.00 - .0) / .01)) + 1, endpoint=True)
         self.maxDets = [1, 10, 100]
@@ -511,9 +498,12 @@ class Params:
         self.useCats = 1
 
     def setKpParams(self):
+        """
+        设置关键点检测任务的默认参数。
+        """
         self.imgIds = []
         self.catIds = []
-        # np.arange causes trouble.  the data point on arange is slightly larger than the true value
+        # np.arange 会导致问题。np.arange 的数据点略大于真实值。
         self.iouThrs = np.linspace(.5, 0.95, int(np.round((0.95 - .5) / .05)) + 1, endpoint=True)
         self.recThrs = np.linspace(.0, 1.00, int(np.round((1.00 - .0) / .01)) + 1, endpoint=True)
         self.maxDets = [20]
@@ -523,6 +513,10 @@ class Params:
         self.kpt_oks_sigmas = np.array([.26, .25, .25, .35, .35, .79, .79, .72, .72, .62,.62, 1.07, 1.07, .87, .87, .89, .89])/10.0
 
     def __init__(self, iouType='segm'):
+        """
+        初始化参数类。
+        :param iouType: 评估类型，可以是 'segm'（分割）、'bbox'（边界框）或 'keypoints'（关键点）。
+        """
         if iouType == 'segm' or iouType == 'bbox':
             self.setDetParams()
         elif iouType == 'keypoints':
@@ -530,5 +524,5 @@ class Params:
         else:
             raise Exception('iouType not supported')
         self.iouType = iouType
-        # useSegm is deprecated
+        # useSegm 已废弃
         self.useSegm = None
