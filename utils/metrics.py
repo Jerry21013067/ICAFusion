@@ -1,72 +1,71 @@
 # Model validation metrics
 
-from pathlib import Path
-
-import matplotlib.pyplot as plt
-import numpy as np
-import torch
-
-from . import general
+from pathlib import Path  # 用于路径操作
+import matplotlib.pyplot as plt  # 用于绘图
+import numpy as np  # 用于数值计算
+import torch  # PyTorch深度学习框架
+from . import general  # 导入general模块
 
 
 def fitness(x):
-    # Model fitness as a weighted combination of metrics
-    w = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]  # weights for [tp[0], fp[0], fn[0], f1[0], mp, mr, map50, map]
-    return (x[:, :8] * w).sum(1)
+    # 计算模型的适应度，作为指标的加权组合
+    w = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]  # 权重，对应[tp[0], fp[0], fn[0], f1[0], mp, mr, map50, map]
+    return (x[:, :8] * w).sum(1)  # 计算加权和
 
 
 def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names=()):
-    """ Compute the average precision, given the recall and precision curves.
-    Source: https://github.com/rafaelpadilla/Object-Detection-Metrics.
-    # Arguments
-        tp:  True positives (nparray, nx1 or nx10).
-        conf:  Objectness value from 0-1 (nparray).
-        pred_cls:  Predicted object classes (nparray).
-        target_cls:  True object classes (nparray).
-        plot:  Plot precision-recall curve at mAP@0.5
-        save_dir:  Plot save directory
-    # Returns
-        The average precision as computed in py-faster-rcnn.
+    """
+    计算每个类别的平均精度（AP），给定召回率和精确度曲线。
+    来源：<url id="d0djh07hvltmntaj1lq0" type="url" status="parsed" title="GitHub - rafaelpadilla/Object-Detection-Metrics: Most popular metrics used to evaluate object detection algorithms." wc="21583">https://github.com/rafaelpadilla/Object-Detection-Metrics</url> 。
+    # 参数
+        tp:  真正例（nparray, nx1 或 nx10）。
+        conf:  目标性值，范围从0到1（nparray）。
+        pred_cls:  预测的类别（nparray）。
+        target_cls:  真实类别（nparray）。
+        plot:  是否绘制精确率-召回率曲线（mAP@0.5）。
+        save_dir:  图片保存路径。
+    # 返回
+        按照py-faster-rcnn计算的平均精度。
     """
 
-    # Sort by objectness
+    # 按目标性排序
     i = np.argsort(-conf)
     tp, conf, pred_cls = tp[i], conf[i], pred_cls[i]
 
-    # Find unique classes
+    # 找到唯一类别
     unique_classes = np.unique(target_cls)
-    nc = unique_classes.shape[0]  # number of classes, number of detections
+    nc = unique_classes.shape[0]  # 类别数量，检测数量
 
-    # Create Precision-Recall curve and compute AP for each class
-    px, py = np.linspace(0, 1, 1000), []  # for plotting
+    # 创建精确率-召回率曲线并计算每个类别的AP
+    px, py = np.linspace(0, 1, 1000), []  # 用于绘图
     ap, p, r = np.zeros((nc, tp.shape[1])), np.zeros((nc, 1000)), np.zeros((nc, 1000))
     for ci, c in enumerate(unique_classes):
         i = pred_cls == c
-        n_l = (target_cls == c).sum()  # number of labels
-        n_p = i.sum()  # number of predictions
+        n_l = (target_cls == c).sum()  # 标签数量
+        n_p = i.sum()  # 预测数量
 
         if n_p == 0 or n_l == 0:
             continue
         else:
-            # Accumulate FPs and TPs
+            # 累积FP和TP
             fpc = (1 - tp[i]).cumsum(0)
             tpc = tp[i].cumsum(0)
 
-            # Recall
-            recall = tpc / (n_l + 1e-16)  # recall curve
-            r[ci] = np.interp(-px, -conf[i], recall[:, 0], left=0)  # negative x, xp because xp decreases
+            # 召回率
+            recall = tpc / (n_l + 1e-16)  # 召回率曲线
+            r[ci] = np.interp(-px, -conf[i], recall[:, 0], left=0)  # 负x，xp因为xp递减
 
-            # Precision
-            precision = tpc / (tpc + fpc)  # precision curve
-            p[ci] = np.interp(-px, -conf[i], precision[:, 0], left=1)  # p at pr_score
+            # 精确率
+            precision = tpc / (tpc + fpc)  # 精确率曲线
+            p[ci] = np.interp(-px, -conf[i], precision[:, 0], left=1)  # p在pr_score处
 
-            # AP from recall-precision curve
+            # 从召回率-精确率曲线计算AP
             for j in range(tp.shape[1]):
                 ap[ci, j], mpre, mrec = compute_ap(recall[:, j], precision[:, j])
                 if plot and j == 0:
-                    py.append(np.interp(px, mrec, mpre))  # precision at mAP@0.5
+                    py.append(np.interp(px, mrec, mpre))  # mAP@0.5处的精确率
 
-    # Compute F1 (harmonic mean of precision and recall)
+    # 计算F1（精确率和召回率的调和平均）
     f1 = 2 * p * r / (p + r + 1e-16)
     if plot:
         plot_pr_curve(px, py, ap, Path(save_dir) / 'PR_curve.png', names)
@@ -74,64 +73,65 @@ def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names
         plot_mc_curve(px, p, Path(save_dir) / 'P_curve.png', names, ylabel='Precision')
         plot_mc_curve(px, r, Path(save_dir) / 'R_curve.png', names, ylabel='Recall')
 
-    i = f1.mean(0).argmax()  # max F1 index
-    tp = (r * n_l).round()  # true positives
+    i = f1.mean(0).argmax()  # 最大F1索引
+    tp = (r * n_l).round()  # 真正例
     fn = n_l - tp
-    fp = (tp / (p + 1e-16) - tp).round()  # false positives
+    fp = (tp / (p + 1e-16) - tp).round()  # 假正例
 
     return tp[:, i], fp[:, i], fn[:, i], p[:, i], r[:, i], ap, f1[:, i], unique_classes.astype('int32')
 
 
 def compute_ap(recall, precision):
-    """ Compute the average precision, given the recall and precision curves
-    # Arguments
-        recall:    The recall curve (list)
-        precision: The precision curve (list)
-    # Returns
-        Average precision, precision curve, recall curve
+    """
+    给定召回率和精确率曲线，计算平均精度。
+    # 参数
+        recall:    召回率曲线（列表）。
+        precision: 精确率曲线（列表）。
+    # 返回
+        平均精度，精确率曲线，召回率曲线。
     """
 
-    # Append sentinel values to beginning and end
+    # 在开头和结尾追加哨兵值
     mrec = np.concatenate(([0.], recall, [recall[-1] + 0.01]))
     mpre = np.concatenate(([1.], precision, [0.]))
 
-    # Compute the precision envelope
+    # 计算精确率包络
     mpre = np.flip(np.maximum.accumulate(np.flip(mpre)))
 
-    # Integrate area under curve
-    method = 'interp'  # methods: 'continuous', 'interp'
+    # 积分曲线下面积
+    method = 'interp'  # 方法：'continuous', 'interp'
     if method == 'interp':
-        x = np.linspace(0, 1, 101)  # 101-point interp (COCO)
-        ap = np.trapz(np.interp(x, mrec, mpre), x)  # integrate
+        x = np.linspace(0, 1, 101)  # 101点插值（COCO）
+        ap = np.trapz(np.interp(x, mrec, mpre), x)  # 积分
     else:  # 'continuous'
-        i = np.where(mrec[1:] != mrec[:-1])[0]  # points where x axis (recall) changes
-        ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])  # area under curve
+        i = np.where(mrec[1:] != mrec[:-1])[0]  # x轴（召回率）变化的点
+        ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])  # 曲线下面积
 
     return ap, mpre, mrec
 
 
 class ConfusionMatrix:
-    # Updated version of https://github.com/kaanakan/object_detection_confusion_matrix
+    # 更新版本的混淆矩阵类，用于目标检测任务
     def __init__(self, nc, conf=0.25, iou_thres=0.45):
-        self.matrix = np.zeros((nc + 1, nc + 1))
-        self.nc = nc  # number of classes
-        self.conf = conf
-        self.iou_thres = iou_thres
+        self.matrix = np.zeros((nc + 1, nc + 1))  # 初始化混淆矩阵
+        self.nc = nc  # 类别数量
+        self.conf = conf  # 置信度阈值
+        self.iou_thres = iou_thres  # IOU阈值
 
     def process_batch(self, detections, labels):
         """
-        Return intersection-over-union (Jaccard index) of boxes.
-        Both sets of boxes are expected to be in (x1, y1, x2, y2) format.
-        Arguments:
-            detections (Array[N, 6]), x1, y1, x2, y2, conf, class
-            labels (Array[M, 5]), class, x1, y1, x2, y2
-        Returns:
-            None, updates confusion matrix accordingly
+        返回边界框的交并比（Jaccard指数）。
+        预期两组边界框均为(x1, y1, x2, y2)格式。
+        参数：
+            detections (Array[N, 6])，x1, y1, x2, y2, conf, class
+            labels (Array[M, 5])，class, x1, y1, x2, y2
+        返回：
+            无，相应更新混淆矩阵
         """
-        detections = detections[detections[:, 4] > self.conf]
-        gt_classes = labels[:, 0].int()
-        detection_classes = detections[:, 5].int()
-        iou = general.box_iou(labels[:, 1:], detections[:, :4])
+        detections = detections[detections[:, 4] > self.conf]  # 过滤低置信度检测
+        gt_classes = labels[:, 0].int()  # 真实类别
+        detection_classes = detections[:, 5].int()  # 预测类别
+        iou = general.box_iou(labels[:, 1:], detections[:, :4])  # 计算IOU
 
         x = torch.where(iou > self.iou_thres)
         if x[0].shape[0]:
@@ -149,33 +149,33 @@ class ConfusionMatrix:
         for i, gc in enumerate(gt_classes):
             j = m0 == i
             if n and sum(j) == 1:
-                self.matrix[detection_classes[m1[j]], gc] += 1  # correct
+                self.matrix[detection_classes[m1[j]], gc] += 1  # 正确检测
             else:
-                self.matrix[self.nc, gc] += 1  # background FP
+                self.matrix[self.nc, gc] += 1  # 背景假正例
 
         if n:
             for i, dc in enumerate(detection_classes):
                 if not any(m1 == i):
-                    self.matrix[dc, self.nc] += 1  # background FN
+                    self.matrix[dc, self.nc] += 1  # 背景假负例
 
     def matrix(self):
         return self.matrix
 
     def plot(self, save_dir='', names=()):
         try:
-            import seaborn as sn
+            import seaborn as sn  # 导入seaborn库
 
-            array = self.matrix / (self.matrix.sum(0).reshape(1, self.nc + 1) + 1E-6)  # normalize
-            array[array < 0.005] = np.nan  # don't annotate (would appear as 0.00)
+            array = self.matrix / (self.matrix.sum(0).reshape(1, self.nc + 1) + 1E-6)  # 归一化
+            array[array < 0.005] = np.nan  # 不注释（会显示为0.00）
 
             fig = plt.figure(figsize=(12, 9), tight_layout=True)
-            sn.set(font_scale=1.0 if self.nc < 50 else 0.8)  # for label size
-            labels = (0 < len(names) < 99) and len(names) == self.nc  # apply names to ticklabels
+            sn.set(font_scale=1.0 if self.nc < 50 else 0.8)  # 设置字体大小
+            labels = (0 < len(names) < 99) and len(names) == self.nc  # 应用类别名称到刻度标签
             sn.heatmap(array, annot=self.nc < 30, annot_kws={"size": 8}, cmap='Blues', fmt='.2f', square=True,
                        xticklabels=names + ['background FP'] if labels else "auto",
                        yticklabels=names + ['background FN'] if labels else "auto").set_facecolor((1, 1, 1))
-            fig.axes[0].set_xlabel('True')
-            fig.axes[0].set_ylabel('Predicted')
+            fig.axes[0].set_xlabel('True')  # 真实
+            fig.axes[0].set_ylabel('Predicted')  # 预测
             fig.savefig(Path(save_dir) / 'confusion_matrix.png', dpi=250)
         except Exception as e:
             pass
@@ -188,19 +188,19 @@ class ConfusionMatrix:
 # Plots ----------------------------------------------------------------------------------------------------------------
 
 def plot_pr_curve(px, py, ap, save_dir='pr_curve.png', names=()):
-    # Precision-recall curve
+    # 精确率-召回率曲线
     fig, ax = plt.subplots(1, 1, figsize=(9, 6), tight_layout=True)
     py = np.stack(py, axis=1)
 
-    if 0 < len(names) < 21:  # display per-class legend if < 21 classes
+    if 0 < len(names) < 21:  # 如果类别数量少于21，显示每个类别的图例
         for i, y in enumerate(py.T):
-            ax.plot(px, y, linewidth=1, label=f'{names[i]} {ap[i, 0]:.3f}')  # plot(recall, precision)
+            ax.plot(px, y, linewidth=1, label=f'{names[i]} {ap[i, 0]:.3f}')  # 绘制召回率-精确率曲线
     else:
-        ax.plot(px, py, linewidth=1, color='grey')  # plot(recall, precision)
+        ax.plot(px, py, linewidth=1, color='grey')  # 绘制召回率-精确率曲线
 
     ax.plot(px, py.mean(1), linewidth=3, color='blue', label='all classes %.3f mAP@0.5' % ap[:, 0].mean())
-    ax.set_xlabel('Recall')
-    ax.set_ylabel('Precision')
+    ax.set_xlabel('Recall')  # 召回率
+    ax.set_ylabel('Precision')  # 精确率
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     plt.legend(bbox_to_anchor=(1.04, 1), loc="upper left")
@@ -208,14 +208,14 @@ def plot_pr_curve(px, py, ap, save_dir='pr_curve.png', names=()):
 
 
 def plot_mc_curve(px, py, save_dir='mc_curve.png', names=(), xlabel='Confidence', ylabel='Metric'):
-    # Metric-confidence curve
+    # 指标-置信度曲线
     fig, ax = plt.subplots(1, 1, figsize=(9, 6), tight_layout=True)
 
-    if 0 < len(names) < 21:  # display per-class legend if < 21 classes
+    if 0 < len(names) < 21:  # 如果类别数量少于21，显示每个类别的图例
         for i, y in enumerate(py):
-            ax.plot(px, y, linewidth=1, label=f'{names[i]}')  # plot(confidence, metric)
+            ax.plot(px, y, linewidth=1, label=f'{names[i]}')  # 绘制置信度-指标曲线
     else:
-        ax.plot(px, py.T, linewidth=1, color='grey')  # plot(confidence, metric)
+        ax.plot(px, py.T, linewidth=1, color='grey')  # 绘制置信度-指标曲线
 
     y = py.mean(0)
     ax.plot(px, y, linewidth=3, color='blue', label=f'all classes {y.max():.2f} at {px[y.argmax()]:.3f}')

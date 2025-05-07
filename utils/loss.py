@@ -4,53 +4,49 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-from utils.general import bbox_iou
-from utils.torch_utils import is_parallel
-from utils.plots import plot_samples
-from torch.autograd import Variable
-from descriptor.LSS import denseLSS
-from descriptor.CFOG import denseCFOG
+from utils.general import bbox_iou  # 边界框IoU计算工具
+from utils.torch_utils import is_parallel  # 检查模型是否并行运行的工具
+from utils.plots import plot_samples  # 绘制样本的工具
+from torch.autograd import Variable  # PyTorch自动微分变量
+from descriptor.LSS import denseLSS  # 密集LSS描述符
+from descriptor.CFOG import denseCFOG  # 密集CFOG描述符
 
 
 def smooth_BCE(eps=0.1):  # https://github.com/ultralytics/yolov3/issues/238#issuecomment-598028441
-    # return positive, negative label smoothing BCE targets
+    # 返回正样本和负样本的平滑BCE目标值
     return 1.0 - 0.5 * eps, 0.5 * eps
 
 
 class BCEBlurWithLogitsLoss(nn.Module):
-    # BCEwithLogitLoss() with reduced missing label effects.
+    # 带有减少缺失标签影响的BCEWithLogitsLoss
     def __init__(self, alpha=0.05):
         super(BCEBlurWithLogitsLoss, self).__init__()
-        self.loss_fcn = nn.BCEWithLogitsLoss(reduction='none')  # must be nn.BCEWithLogitsLoss()
+        self.loss_fcn = nn.BCEWithLogitsLoss(reduction='none')  # 必须是nn.BCEWithLogitsLoss()
         self.alpha = alpha
 
     def forward(self, pred, true):
         loss = self.loss_fcn(pred, true)
-        pred = torch.sigmoid(pred)  # prob from logits
-        dx = pred - true  # reduce only missing label effects
-        # dx = (pred - true).abs()  # reduce missing label and false label effects
+        pred = torch.sigmoid(pred)  # 从logits计算概率
+        dx = pred - true  # 减少只有缺失标签的影响
         alpha_factor = 1 - torch.exp((dx - 1) / (self.alpha + 1e-4))
         loss *= alpha_factor
         return loss.mean()
 
 
 class FocalLoss(nn.Module):
-    # Wraps focal loss around existing loss_fcn(), i.e. criteria = FocalLoss(nn.BCEWithLogitsLoss(), gamma=1.5)
+    # 包装现有的损失函数，实现Focal Loss
     def __init__(self, loss_fcn, gamma=1.5, alpha=0.25):
         super(FocalLoss, self).__init__()
-        self.loss_fcn = loss_fcn  # must be nn.BCEWithLogitsLoss()
+        self.loss_fcn = loss_fcn  # 必须是nn.BCEWithLogitsLoss()
         self.gamma = gamma
         self.alpha = alpha
         self.reduction = loss_fcn.reduction
-        self.loss_fcn.reduction = 'none'  # required to apply FL to each element
+        self.loss_fcn.reduction = 'none'  # 需要对每个元素应用FL
 
     def forward(self, pred, true):
         loss = self.loss_fcn(pred, true)
-        # p_t = torch.exp(-loss)
-        # loss *= self.alpha * (1.000001 - p_t) ** self.gamma  # non-zero power for gradient stability
-
         # TF implementation https://github.com/tensorflow/addons/blob/v0.7.1/tensorflow_addons/losses/focal_loss.py
-        pred_prob = torch.sigmoid(pred)  # prob from logits
+        pred_prob = torch.sigmoid(pred)  # 从logits计算概率
         p_t = true * pred_prob + (1 - true) * (1 - pred_prob)
         alpha_factor = true * self.alpha + (1 - true) * (1 - self.alpha)
         modulating_factor = (1.0 - p_t) ** self.gamma
@@ -65,19 +61,19 @@ class FocalLoss(nn.Module):
 
 
 class QFocalLoss(nn.Module):
-    # Wraps Quality focal loss around existing loss_fcn(), i.e. criteria = FocalLoss(nn.BCEWithLogitsLoss(), gamma=1.5)
+    # 包装现有的损失函数，实现Quality Focal Loss
     def __init__(self, loss_fcn, gamma=1.5, alpha=0.25):
         super(QFocalLoss, self).__init__()
-        self.loss_fcn = loss_fcn  # must be nn.BCEWithLogitsLoss()
+        self.loss_fcn = loss_fcn  # 必须是nn.BCEWithLogitsLoss()
         self.gamma = gamma
         self.alpha = alpha
         self.reduction = loss_fcn.reduction
-        self.loss_fcn.reduction = 'none'  # required to apply FL to each element
+        self.loss_fcn.reduction = 'none'  # 需要对每个元素应用FL
 
     def forward(self, pred, true):
         loss = self.loss_fcn(pred, true)
 
-        pred_prob = torch.sigmoid(pred)  # prob from logits
+        pred_prob = torch.sigmoid(pred)  # 从logits计算概率
         alpha_factor = true * self.alpha + (1 - true) * (1 - self.alpha)
         modulating_factor = torch.abs(true - pred_prob) ** self.gamma
         loss *= alpha_factor * modulating_factor
@@ -94,17 +90,16 @@ class QFocalLoss(nn.Module):
 class VFLoss(nn.Module):
     def __init__(self, loss_fcn, gamma=2.0, alpha=0.25):
         super(VFLoss, self).__init__()
-        # 传递 nn.BCEWithLogitsLoss() 损失函数  must be nn.BCEWithLogitsLoss()
-        self.loss_fcn = loss_fcn  #
+        self.loss_fcn = loss_fcn  # 传递nn.BCEWithLogitsLoss()损失函数
         self.gamma = gamma
         self.alpha = alpha
         self.reduction = loss_fcn.reduction
-        self.loss_fcn.reduction = 'none'  # required to apply VFL to each element
+        self.loss_fcn.reduction = 'none'  # 需要对每个元素应用VFL
 
     def forward(self, pred, true):
         loss = self.loss_fcn(pred, true)
 
-        pred_prob = torch.sigmoid(pred)  # prob from logits
+        pred_prob = torch.sigmoid(pred)  # 从logits计算概率
 
         focal_weight = true * (true > 0.0).float() + self.alpha * (pred_prob - true).abs().pow(self.gamma) * (true <= 0.0).float()
         loss *= focal_weight
@@ -180,7 +175,7 @@ class SimLoss(nn.Module):
         self.gamma = gamma
         self.sigmoid = nn.Sigmoid()
 
-    def des_SSD(self, i, j, descriptor):
+    def des_SSD(self, i, j, descriptor):  # 计算SSD描述符
         mask_i = torch.ge(i.squeeze(0).squeeze(0), 1)
         mask_i = torch.tensor(mask_i, dtype=torch.float32)
         mask_j = torch.ge(j.squeeze(0).squeeze(0), 1)
@@ -199,7 +194,7 @@ class SimLoss(nn.Module):
         loss = SSD_loss(des_i, des_j) / num
         return loss
 
-    def des_NCC(self, i, j, descriptor):
+    def des_NCC(self, i, j, descriptor):   # 计算NCC描述符
         mask_i = torch.ge(i.squeeze(0).squeeze(0), 1)
         mask_i = torch.tensor(mask_i, dtype=torch.float32)
         mask_j = torch.ge(j.squeeze(0).squeeze(0), 1)
@@ -217,7 +212,7 @@ class SimLoss(nn.Module):
         loss = self.gncc_loss(des_i, des_j) * 512 * 512 / num
         return loss
 
-    def gradient_loss(self, s, penalty='l2'):
+    def gradient_loss(self, s, penalty='l2'):  # 计算梯度损失
         dy = torch.abs(s[:, :, 1:, :] - s[:, :, :-1, :])
         dx = torch.abs(s[:, :, :, 1:] - s[:, :, :, :-1])
         if (penalty == 'l2'):
@@ -226,17 +221,17 @@ class SimLoss(nn.Module):
         d = torch.mean(dx) + torch.mean(dy)
         return d / 2.0
 
-    def mse_loss(self, x, y):
+    def mse_loss(self, x, y):  # 计算均方误差损失
         return torch.mean((x - y) ** 2)
 
-    def DSC(self, pred, target):
+    def DSC(self, pred, target):  # 计算Dice相似系数
         smooth = 1e-5
         m1 = pred.flatten()
         m2 = target.flatten()
         intersection = (m1 * m2).sum()
         return (2. * intersection + smooth) / (m1.sum() + m2.sum() + smooth)
 
-    def gncc_loss(self, I, J, eps=1e-5):
+    def gncc_loss(self, I, J, eps=1e-5):  # 计算归一化互相关损失
         I2 = I.pow(2)
         J2 = J.pow(2)
         IJ = I * J
@@ -249,7 +244,7 @@ class SimLoss(nn.Module):
         cc = cross / (I_var.sqrt() * J_var.sqrt() + eps)  # 1e-5
         return -1.0 * cc + 1
 
-    def compute_local_sums(self, I, J, filt, stride, padding, win):
+    def compute_local_sums(self, I, J, filt, stride, padding, win):  # 计算局部和
         I2, J2, IJ = I * I, J * J, I * J
         I_sum = nn.functional.conv2d(I, filt, stride=stride, padding=padding)
         J_sum = nn.functional.conv2d(J, filt, stride=stride, padding=padding)
@@ -264,7 +259,7 @@ class SimLoss(nn.Module):
         J_var = J2_sum - 2 * u_J * J_sum + u_J * u_J * win_size
         return I_var, J_var, cross
 
-    def cc_loss(self, x, y):
+    def cc_loss(self, x, y):  # 计算交叉相关损失
         dim = [2, 3, 4]
         mean_x = torch.mean(x, dim, keepdim=True)
         mean_y = torch.mean(y, dim, keepdim=True)
@@ -274,7 +269,7 @@ class SimLoss(nn.Module):
         stddev_y = torch.sum(torch.sqrt(mean_y2 - mean_y ** 2), dim, keepdim=True)
         return -torch.mean((x - mean_x) * (y - mean_y) / (stddev_x * stddev_y))
 
-    def Get_Ja(self, flow):
+    def Get_Ja(self, flow):  # 计算Jacobian行列式
         D_y = (flow[:, 1:, :-1, :-1, :] - flow[:, :-1, :-1, :-1, :])
         D_x = (flow[:, :-1, 1:, :-1, :] - flow[:, :-1, :-1, :-1, :])
         D_z = (flow[:, :-1, :-1, 1:, :] - flow[:, :-1, :-1, :-1, :])
@@ -283,11 +278,11 @@ class SimLoss(nn.Module):
         D3 = (D_x[..., 2]) * (D_y[..., 0] * D_z[..., 1] - (D_y[..., 1] + 1) * D_z[..., 0])
         return D1 - D2 + D3
 
-    def NJ_loss(self, ypred):
+    def NJ_loss(self, ypred):  # 计算负Jacobian损失
         Neg_Jac = 0.5 * (torch.abs(self.Get_Ja(ypred)) - self.Get_Ja(ypred))
         return torch.sum(Neg_Jac)
 
-    def lncc_loss(self, i, j, win=[9, 9], eps=1e-5):
+    def lncc_loss(self, i, j, win=[9, 9], eps=1e-5):  # 计算局部归一化交叉相关损失
         I = i
         J = j
         I2 = I.pow(2)
@@ -311,7 +306,7 @@ class SimLoss(nn.Module):
         return lcc
 
     def forward(self, reference, sensed_tran, sensed, reference_inv_tran, descriptor, similarity):
-        if similarity == 'SSD':  # Similarity: SSD or NCC based on descriptors
+        if similarity == 'SSD':  # 根据描述符和相似性类型选择损失函数
             loss1 = Variable(self.des_SSD(reference, sensed_tran, descriptor), requires_grad=True)
             loss2 = Variable(self.des_SSD(sensed, reference_inv_tran, descriptor), requires_grad=True)
         elif similarity == 'NCC':
@@ -323,20 +318,20 @@ class SimLoss(nn.Module):
 
 
 class ComputeLoss:
-    # Compute losses
+    # 计算损失
     def __init__(self, model, autobalance=False):
         super(ComputeLoss, self).__init__()
         self.sort_obj_iou = True  # 在计算objectness时是否对ciou进行排序
-        device = next(model.parameters()).device  # get model device
-        h = model.hyp  # hyperparameters
+        device = next(model.parameters()).device  # 获取模型设备
+        h = model.hyp  # 获取超参数
 
-        # Define criteria
+        # 定义损失函数
         BCEcls = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([h['cls_pw']], device=device))
         BCEobj = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([h['obj_pw']], device=device))
         #BCEobj = VFLoss(BCEobj)
 
-        # Class label smoothing https://arxiv.org/pdf/1902.04103.pdf eqn 3
-        self.cp, self.cn = smooth_BCE(eps=h.get('label_smoothing', 0.0))  # positive, negative BCE targets
+        # 类别标签平滑 https://arxiv.org/pdf/1902.04103.pdf eqn 3
+        self.cp, self.cn = smooth_BCE(eps=h.get('label_smoothing', 0.0))  # 正样本和负样本的BCE目标值
 
         # Focal loss
         g = h['fl_gamma']  # focal loss gamma
@@ -344,14 +339,14 @@ class ComputeLoss:
             BCEcls, BCEobj = FocalLoss(BCEcls, g), FocalLoss(BCEobj, g)
 
         det = model.module.model[-1] if is_parallel(model) else model.model[-1]  # Detect() module
-        self.balance = {3: [4.0, 1.0, 0.4]}.get(det.nl, [4.0, 1.0, 0.25, 0.06, .02])  # P3-P7
+        self.balance = {3: [4.0, 1.0, 0.4]}.get(det.nl, [4.0, 1.0, 0.25, 0.06, .02])  # 平衡因子
         self.ssi = list(det.stride).index(16) if autobalance else 0  # stride 16 index
         self.BCEcls, self.BCEobj, self.gr, self.hyp, self.autobalance = BCEcls, BCEobj, model.gr, h, autobalance
         self.RKobj = RankingLoss(2.0)
         for k in 'na', 'nc', 'nl', 'anchors':
             setattr(self, k, getattr(det, k))
 
-    def __call__(self, p, targets):  # predictions, targets, model
+    def __call__(self, p, targets):  # 预测值，目标值，模型
         device = targets.device
         lcls, lbox, lobj, lrk = torch.zeros(1, device=device), torch.zeros(1, device=device), torch.zeros(1, device=device), torch.zeros(1, device=device)
         tcls, tbox, indices, anchors, offsets = self.build_targets(p, targets)  # targets
@@ -359,33 +354,33 @@ class ComputeLoss:
         #plot_samples(batch_index, imgs, path, tcls, tbox, indices, anchors, offsets, targets)
 
         # Losses
-        for i, pi in enumerate(p):  # layer index, layer predictions
-            b, a, gj, gi = indices[i]  # image, anchor, gridy, gridx
-            tobj = torch.zeros_like(pi[..., 0], device=device)  # target obj
+        for i, pi in enumerate(p):  # 遍历每一层的预测值
+            b, a, gj, gi = indices[i]  # 图像索引，锚点索引，网格y，网格x
+            tobj = torch.zeros_like(pi[..., 0], device=device)  # 目标obj
 
             n = b.shape[0]  # number of targets
             if n:
-                ps = pi[b, a, gj, gi]  # prediction subset corresponding to targets
+                ps = pi[b, a, gj, gi]  # 对应目标的预测子集
 
-                # Regression
+                # 回归损失
                 pxy = ps[:, :2].sigmoid() * 2. - 0.5
                 pwh = (ps[:, 2:4].sigmoid() * 2) ** 2 * anchors[i]
-                pbox = torch.cat((pxy, pwh), 1)  # predicted box
-                iou = bbox_iou(pbox.T, tbox[i], x1y1x2y2=False, CIoU=True)  # iou(prediction, target)
-                lbox += (1.0 - iou).mean()  # iou loss
+                pbox = torch.cat((pxy, pwh), 1)  # 预测框
+                iou = bbox_iou(pbox.T, tbox[i], x1y1x2y2=False, CIoU=True)  # 计算IoU
+                lbox += (1.0 - iou).mean()  # IoU损失
 
-                # Objectness
+                # 目标性损失
                 score_iou = iou.detach().clamp(0).type(tobj.dtype)
                 if self.sort_obj_iou:
-                    sort_id = torch.argsort(score_iou)  # 将iou按照从小到大进行排序，返回下标索引
+                    sort_id = torch.argsort(score_iou)  # 对IoU进行排序
                     b, a, gj, gi, score_iou = b[sort_id], a[sort_id], gj[sort_id], gi[sort_id], score_iou[sort_id]
-                tobj[b, a, gj, gi] = (1.0 - self.gr) + self.gr * score_iou  # 根据model.gr设置真实框的标签值
+                tobj[b, a, gj, gi] = (1.0 - self.gr) + self.gr * score_iou  # 设置目标obj值
 
-                # Classification
-                if self.nc > 1:  # cls loss (only if multiple classes)
-                    t = torch.full_like(ps[:, 5:], self.cn, device=device)  # targets
+                # 分类损失
+                if self.nc > 1:  # 如果有多个类别
+                    t = torch.full_like(ps[:, 5:], self.cn, device=device)  # 目标张量
                     t[range(n), tcls[i]] = self.cp
-                    lcls += self.BCEcls(ps[:, 5:], t)  # BCE
+                    lcls += self.BCEcls(ps[:, 5:], t)  # BCE损失
 
             # Ranking
             #lrk += self.RKobj(pi[..., 4], tobj)
@@ -401,41 +396,40 @@ class ComputeLoss:
         lobj *= self.hyp['obj']
         lcls *= self.hyp['cls']
         lrk *= 0.1
-        bs = tobj.shape[0]  # batch size
+        bs = tobj.shape[0]  # 批量大小
 
         loss = lbox + lobj + lcls + lrk
         return loss * bs, torch.cat((lbox, lobj, lcls, lrk)).detach()
 
     def build_targets(self, p, targets):
-        # Build targets for compute_loss(), input targets(image,class,x,y,w,h)
-        na, nt = self.na, targets.shape[0]  # number of anchors, targets
+        # 构建目标
+        na, nt = self.na, targets.shape[0]  # 锚点数量，目标数量
         tcls, tbox, indices, anch, offset = [], [], [], [], []
-        gain = torch.ones(7, device=targets.device)  # normalized to gridspace gain
-        ai = torch.arange(na, device=targets.device).float().view(na, 1).repeat(1, nt)  # same as .repeat_interleave(nt)
-        targets = torch.cat((targets.repeat(na, 1, 1), ai[:, :, None]), 2)  # append anchor indices
+        gain = torch.ones(7, device=targets.device)  # 归一化到网格空间的增益
+        ai = torch.arange(na, device=targets.device).float().view(na, 1).repeat(1, nt)  # 锚点索引
+        targets = torch.cat((targets.repeat(na, 1, 1), ai[:, :, None]), 2)  # 添加锚点索引
 
-        g = 0.5  # bias
+        g = 0.5  # 偏差
         off = torch.tensor([[0, 0],
                             [1, 0], [0, 1], [-1, 0], [0, -1],  # j,k,l,m
                             # [1, 1], [1, -1], [-1, 1], [-1, -1],  # jk,jm,lk,lm
-                            ], device=targets.device).float() * g  # offsets
+                            ], device=targets.device).float() * g  # 偏移量
 
         for i in range(self.nl):
             anchors, shape = self.anchors[i], p[i].shape
-            gain[2:6] = torch.tensor(p[i].shape)[[3, 2, 3, 2]]  # xyxy gain
+            gain[2:6] = torch.tensor(p[i].shape)[[3, 2, 3, 2]]  # xyxy增益
 
-            # Match targets to anchors
+            # 匹配目标和锚点
             t = targets * gain
             if nt:
-                # Matches
-                r = t[:, :, 4:6] / anchors[:, None]  # wh ratio
-                j = torch.max(r, 1. / r).max(2)[0] < self.hyp['anchor_t']  # compare
-                # j = wh_iou(anchors, t[:, 4:6]) > model.hyp['iou_t']  # iou(3,n)=wh_iou(anchors(3,2), gwh(n,2))
-                t = t[j]  # filter
+                # 匹配
+                r = t[:, :, 4:6] / anchors[:, None]  # wh比率
+                j = torch.max(r, 1. / r).max(2)[0] < self.hyp['anchor_t']  # 比较
+                t = t[j]  # 过滤
 
-                # Offsets
-                gxy = t[:, 2:4]  # grid xy
-                gxi = gain[[2, 3]] - gxy  # inverse
+                # 偏移量
+                gxy = t[:, 2:4]  # 网格xy
+                gxi = gain[[2, 3]] - gxy  # 反向
                 j, k = ((gxy % 1. < g) & (gxy > 1.)).T
                 l, m = ((gxi % 1. < g) & (gxi > 1.)).T
                 j = torch.stack((torch.ones_like(j), j, k, l, m))
@@ -445,19 +439,20 @@ class ComputeLoss:
                 t = targets[0]
                 offsets = 0
 
-            # Define
-            b, c = t[:, :2].long().T  # image, class
-            gxy = t[:, 2:4]  # grid xy
-            gwh = t[:, 4:6]  # grid wh
+            # 定义
+            b, c = t[:, :2].long().T  # 图像，类别
+            gxy = t[:, 2:4]  # 网格xy
+            gwh = t[:, 4:6]  # 网格wh
             gij = (gxy - offsets).long()
-            gi, gj = gij.T  # grid xy indices
+            gi, gj = gij.T  # 网格xy索引
 
-            # Append
-            a = t[:, 6].long()  # anchor indices
-            indices.append((b, a, gj.clamp_(0, shape[2] - 1), gi.clamp_(0, shape[3] - 1)))  # image, anchor, grid indices
-            tbox.append(torch.cat((gxy - gij, gwh), 1))  # box
-            anch.append(anchors[a])  # anchors
-            tcls.append(c)  # class
+
+            # 添加
+            a = t[:, 6].long()  # 锚点索引
+            indices.append((b, a, gj.clamp_(0, shape[2] - 1), gi.clamp_(0, shape[3] - 1)))  # 图像，锚点，网格索引
+            tbox.append(torch.cat((gxy - gij, gwh), 1))  # 边界框
+            anch.append(anchors[a])  # 锚点
+            tcls.append(c)  # 类别
             offset.append(offsets)
 
         return tcls, tbox, indices, anch, offset
